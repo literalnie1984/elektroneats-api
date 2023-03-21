@@ -2,14 +2,15 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Deserialize, Serialize)]
-#[sea_orm(table_name = "posts")]
+#[sea_orm(table_name = "user")]
 pub struct Model {
     #[sea_orm(primary_key)]
     #[serde(skip_deserializing)]
     pub id: i32,
-    pub title: String,
-    #[sea_orm(column_type = "Text")]
-    pub text: String,
+    pub username: String,
+    pub password: String,
+    #[serde(skip_deserializing)]
+    pub balance: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

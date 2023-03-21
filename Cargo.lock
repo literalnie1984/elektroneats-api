@@ -1350,9 +1350,11 @@ name = "kantyna-api"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "dotenvy",
  "entity",
  "migration",
  "sea-orm",
+ "serde",
 ]
 
 [[package]]
