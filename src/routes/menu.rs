@@ -11,9 +11,16 @@ async fn get_menu() -> actix_web::Result<impl Responder> {
 
 #[get("/today")]
 async fn get_menu_today() -> actix_web::Result<impl Responder> {
-    let curr_day = chrono::offset::Local::now().date().weekday() as usize;
+    let curr_day = (chrono::offset::Local::now().date_naive().weekday() as usize).min(5);
     let menu = scrape_menu().await?;
     Ok(web::Json(menu[curr_day].clone()))
+}
+
+#[get("/day/{day}")]
+async fn get_menu_day(day: web::Path<u32>) -> actix_web::Result<impl Responder> {
+    let day = day.into_inner().min(5) as usize;
+    let menu = scrape_menu().await?;
+    Ok(web::Json(menu[day].clone()))
 }
 
 #[get("/{item_id}/")]
