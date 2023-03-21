@@ -1,7 +1,10 @@
 use actix_web::{get, web, Responder};
 
+use crate::scraper::scrape_menu;
+
 #[get("/")]
 async fn get_menu() -> impl Responder {
+    scrape_menu().await;
     "TODO - get menu for today"
 }
 
