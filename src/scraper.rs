@@ -25,7 +25,10 @@ impl MenuDay {
         Self {
             soup: String::new(),
             dishes: Vec::with_capacity(3),
-            extras: vec!["ziemniaki".into(), "surówka".into(), "kompot".into()],
+            extras: ["ziemniaki", "surówka", "kompot"]
+                .iter()
+                .map(|val| String::from(*val))
+                .collect(),
         }
     }
 }
@@ -54,8 +57,20 @@ fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
     menu_days
 }
 
+fn trim_whitespace(s: &str) -> String {
+    let mut owned = s.trim().to_string();
+    let mut prev = ' ';
+    owned.retain(|ch| {
+        let res = (ch != ' ' || prev != ' ') && ch != '\n';
+        prev = ch;
+        res
+    });
+
+    owned
+}
+
 pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
-    let site_data = web::block(|| get_menu().expect("Coulnd't get site data")).await?;
+    let site_data = web::block(|| get_menu().expect("Couldn't get site data")).await?;
 
     let document = Html::parse_document(&site_data);
     let tr_selector = Selector::parse(".xl7624020").unwrap();
@@ -73,7 +88,7 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
         let vec: Vec<_> = row
             .text()
             .skip(1)
-            .map(|val| val.trim().replace("\n", ""))
+            .map(trim_whitespace)
             .filter(|val| !val.is_empty())
             .collect();
 
