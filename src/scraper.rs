@@ -5,6 +5,7 @@ use scraper::{Html, Selector};
 use serde::Serialize;
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
+const TWO_PARTS_DISHES_PREFIXES: [&'static str; 2] = ["po ", "i "];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MenuDay {
@@ -40,7 +41,7 @@ fn get_menu() -> Result<String, ureq::Error> {
 }
 
 fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
-    let mut menu_days: Vec<MenuDay> = vec![MenuDay::same_extras(); 3];
+    let mut menu_days: Vec<MenuDay> = vec![MenuDay::empty(); 3];
 
     //soup
     let soups = &vec[0];
@@ -48,9 +49,29 @@ fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
         menu_days[idx].soup = soups[idx].clone();
     }
 
-    for dishes in vec.iter().skip(2).take(3) {
+    //dishes
+    for dishes in vec.iter().skip(2).take_while(|dishes| !dishes.is_empty()) {
         for idx in 0..3 {
-            menu_days[idx].dishes.push(dishes[idx].clone());
+            let curr_dish = &dishes[idx];
+            if TWO_PARTS_DISHES_PREFIXES
+                .iter()
+                .map(|prefix| curr_dish.starts_with(prefix))
+                .any(|bl| bl)
+            {
+                if let Some(last_dish) = menu_days[idx].dishes.last_mut() {
+                    last_dish.push_str(" ");
+                    last_dish.push_str(curr_dish);
+                }
+            } else {
+                menu_days[idx].dishes.push(curr_dish.clone());
+            }
+        }
+    }
+
+    //extras
+    for extras in vec.iter().rev().take(3) {
+        for idx in 0..3 {
+            menu_days[idx].extras.push(extras[idx].clone());
         }
     }
 
@@ -74,9 +95,10 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
 
     let document = Html::parse_document(&site_data);
     let tr_selector = Selector::parse(".xl7624020").unwrap();
+    let td_selector = Selector::parse("td").unwrap();
     let dishes = document.select(&tr_selector);
 
-    //since table is set up weird in HTML this is probably the best solution
+    //since table is set up weirdly in HTML this is probably the best solution
     let mut mon_to_wed: Vec<_> = Vec::with_capacity(11);
     let mut thu_to_sat: Vec<_> = Vec::with_capacity(11);
     let mut is_wed = false;
@@ -85,12 +107,15 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
         let first = val.text().nth(1);
         first.is_some() && first.unwrap() != "PRZERWY OBIADOWE"
     }) {
-        let vec: Vec<_> = row
-            .text()
-            .skip(1)
-            .map(trim_whitespace)
-            .filter(|val| !val.is_empty())
+        let mut vec: Vec<_> = row
+            .select(&td_selector)
+            .into_iter()
+            .map(|td| td.text().map(trim_whitespace).collect::<String>())
             .collect();
+
+        if vec.iter().all(|val| val.is_empty()) {
+            vec.clear();
+        }
 
         if !is_wed {
             if let Some(txt) = vec.iter().nth(0) {
@@ -108,6 +133,7 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
             mon_to_wed.push(vec);
         }
     }
+
     let mut weekly_menu: Vec<MenuDay> = Vec::with_capacity(6);
     weekly_menu.append(&mut vec_to_menu(&mon_to_wed));
     weekly_menu.append(&mut vec_to_menu(&thu_to_sat));
