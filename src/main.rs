@@ -2,10 +2,11 @@ use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web, post};
 use migration::{Migrator, MigratorTrait};
-use sea_orm::{EntityTrait,DatabaseConnection, ModelTrait, ActiveValue, ActiveModelTrait};
+use sea_orm::{EntityTrait, ModelTrait, ActiveValue, ActiveModelTrait};
 
 use entity::{user, order};
 use entity::prelude::{User, Order};
+use kantyna_api::appstate::AppState;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -38,12 +39,6 @@ async fn main() -> std::io::Result<()> {
     .bind(("127.0.0.1", 4765))? //arbitrary port used
     .run()
     .await
-}
-
-
-#[derive(Debug, Clone)]
-struct AppState {
-    conn: DatabaseConnection,
 }
 
 #[post("/get-orders/{user_id}")]
