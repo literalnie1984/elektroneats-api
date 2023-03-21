@@ -1,7 +1,7 @@
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web, post};
-use migration::{Migrator, MigratorTrait, DbErr};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{EntityTrait,DatabaseConnection, ModelTrait, ActiveValue, ActiveModelTrait};
 
 use entity::{user, order};
