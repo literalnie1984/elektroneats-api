@@ -4,6 +4,8 @@ use kantyna_api::routes::users::*;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let menu = kantyna_api::scraper::scrape_menu().await;
+    print!("{menu:?}");
     HttpServer::new(|| {
         App::new().service(
             web::scope("/api")
