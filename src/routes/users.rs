@@ -45,6 +45,21 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     let user = user.into_inner();
 
+    let user_query = User::find()
+    .filter(user::Column::Username.eq(&user.username))
+    .one(conn)
+    .await;
+
+    if let Err(error) = user_query {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    let user_query = user_query.unwrap();
+    if user_query.is_some() {
+        return HttpResponse::BadRequest().body("Account already exists");
+    }
+
     let salt = nanoid!(16);
     let salt_copy: [u8; 16] = salt.as_bytes().try_into().unwrap();
     let hashed_pass = hash_with_salt(user.password.as_bytes(), DEFAULT_COST, salt_copy).unwrap();
