@@ -1,25 +1,45 @@
 use actix_web::{App, HttpResponse, HttpServer, Responder, web, post};
 use migration::{Migrator, MigratorTrait, DbErr};
-use sea_orm::{DatabaseConnection, DbConn, ActiveValue, ActiveModelTrait};
+use sea_orm::{EntityTrait,DatabaseConnection, ModelTrait, ActiveValue, ActiveModelTrait};
 
-use entity::user;
-
-struct Mutation;
-impl Mutation {
-    pub async fn add_user(db: &DbConn, user_data: user::Model) -> Result<user::ActiveModel, DbErr> {
-        user::ActiveModel {
-            username: ActiveValue::set(user_data.username),
-            password: ActiveValue::set(user_data.password),
-            ..Default::default()
-        }
-        .save(db)
-        .await
-    }
-}
+use entity::{user, order};
+use entity::prelude::{User, Order};
 
 #[derive(Debug, Clone)]
 struct AppState {
     conn: DatabaseConnection,
+}
+
+#[post("/get-orders/{user_id}")]
+async fn get_all_orders_for_user(user_id: web::Path<i32>, data: web::Data<AppState>) -> impl Responder {
+    let user_id = user_id.into_inner();
+    let conn = &data.conn;
+
+    let user = User::find_by_id(user_id).one(conn).await.unwrap().unwrap();
+    let orders = user.find_related(Order)
+        .all(conn)
+        .await
+        .unwrap();
+
+    HttpResponse::Ok().json(orders)
+}
+
+#[post("/add-order")]
+async fn add_order(order: web::Json<order::Model>, data: web::Data<AppState>) -> impl Responder {
+    let conn = &data.conn;
+
+    let order = order.into_inner();
+
+    order::ActiveModel {
+        user_id: ActiveValue::set(order.user_id),
+        product_id: ActiveValue::set(order.product_id),
+        ..Default::default()
+    }
+    .save(conn)
+    .await
+    .unwrap();
+
+    HttpResponse::Ok().body("Hello world")
 }
 
 #[post("/add")]
@@ -28,7 +48,14 @@ async fn add_user(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     let user = user.into_inner();
 
-    Mutation::add_user(conn, user).await.unwrap();
+    user::ActiveModel {
+        username: ActiveValue::set(user.username),
+        password: ActiveValue::set(user.password),
+        ..Default::default()
+    }
+    .save(conn)
+    .await
+    .unwrap();
 
     HttpResponse::Ok().body("Hello world")
 }
@@ -47,6 +74,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(state.clone()))
             .service(add_user)
+            .service(add_order)
+            .service(get_all_orders_for_user)
         })
         .bind(("127.0.0.1", 4765))?
         .run()
