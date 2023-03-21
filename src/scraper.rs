@@ -2,10 +2,11 @@ use std::vec;
 
 use actix_web::web;
 use scraper::{Html, Selector};
+use serde::Serialize;
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MenuDay {
     soup: String,
     dishes: Vec<String>,
@@ -95,7 +96,6 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
     let mut weekly_menu: Vec<MenuDay> = Vec::with_capacity(6);
     weekly_menu.append(&mut vec_to_menu(&mon_to_wed));
     weekly_menu.append(&mut vec_to_menu(&thu_to_sat));
-    dbg!(weekly_menu.clone());
 
     Ok(weekly_menu)
 }

@@ -13,7 +13,12 @@ async fn main() -> std::io::Result<()> {
                         .service(register)
                         .service(is_logged),
                 )
-                .service(web::scope("/menu").service(get_menu).service(get_menu_item)),
+                .service(
+                    web::scope("/menu")
+                        .service(get_menu)
+                        .service(get_menu_item)
+                        .service(get_menu_today),
+                ),
         )
     })
     .bind(("127.0.0.1", 4765))? //arbitrary port used
