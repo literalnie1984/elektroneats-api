@@ -4,8 +4,8 @@ use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
 use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
 use nanoid::nanoid;
 
-use entity::{user, order};
-use entity::prelude::{User, Order};
+use entity::{user};
+use entity::prelude::{User};
 
 use crate::appstate::AppState;
 
@@ -17,8 +17,14 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
     let user_query = User::find()
     .filter(user::Column::Username.eq(user.username))
     .one(conn)
-    .await
-    .unwrap();
+    .await;
+
+    if let Err(error) = user_query {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    let user_query = user_query.unwrap();
 
     if user_query.is_none() {
         return HttpResponse::BadRequest().body("Account does not exist");
@@ -43,16 +49,20 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
     let salt_copy: [u8; 16] = salt.as_bytes().try_into().unwrap();
     let hashed_pass = hash_with_salt(user.password.as_bytes(), DEFAULT_COST, salt_copy).unwrap();
 
-    user::ActiveModel {
+    let result = user::ActiveModel {
         username: Set(user.username),
         password: Set(hashed_pass.to_string()),
         ..Default::default()
     }
     .save(conn)
-    .await
-    .unwrap();
+    .await;
 
-    HttpResponse::Ok().body("Hello world")
+    if let Err(error) = result {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    HttpResponse::Ok().body("Registered successfully")
 }
 
 #[get("/is_logged")]

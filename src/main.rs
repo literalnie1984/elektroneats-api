@@ -2,9 +2,8 @@ use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web, post};
 use migration::{Migrator, MigratorTrait};
-use sea_orm::{EntityTrait, ModelTrait, ActiveValue, ActiveModelTrait};
+use sea_orm::{EntityTrait, ModelTrait};
 
-use entity::{user, order};
 use entity::prelude::{User, Order};
 use kantyna_api::appstate::AppState;
 
@@ -25,7 +24,6 @@ async fn main() -> std::io::Result<()> {
             web::scope("/api")
                 .service(
                     web::scope("/user")
-                        .service(add_order)
                         .service(get_all_orders_for_user)
                         .service(login)
                         .service(register)
