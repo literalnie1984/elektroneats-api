@@ -10,7 +10,7 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(User::Table)
-                    .if_not_exists()
+                    //.if_not_exists() Probably change @ Release
                     .col(
                         ColumnDef::new(User::Id)
                             .integer()
@@ -18,9 +18,20 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(User::Username).string().unique_key().not_null())
+                    .col(
+                        ColumnDef::new(User::Username)
+                            .string()
+                            .unique_key()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(User::Password).string().not_null())
                     .col(ColumnDef::new(User::Balance).integer().not_null())
+                    .col(
+                        ColumnDef::new(User::Verified)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -29,7 +40,7 @@ impl MigrationTrait for Migration {
             .create_table(
                 Table::create()
                     .table(Order::Table)
-                    .if_not_exists()
+                    //.if_not_exists()
                     .col(
                         ColumnDef::new(Order::Id)
                             .integer()
@@ -37,11 +48,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(Order::UserId)
-                            .integer()
-                            .not_null()
-                    )
+                    .col(ColumnDef::new(Order::UserId).integer().not_null())
                     .col(ColumnDef::new(Order::ProductId).integer().not_null())
                     .foreign_key(
                         ForeignKey::create()
@@ -50,7 +57,8 @@ impl MigrationTrait for Migration {
                             .to(User::Table, User::Id),
                     )
                     .to_owned(),
-            ).await?;
+            )
+            .await?;
 
         Ok(())
     }
@@ -60,7 +68,7 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(User::Table).to_owned())
             .await?;
 
-        manager  
+        manager
             .drop_table(Table::drop().table(Order::Table).to_owned())
             .await?;
 
@@ -76,6 +84,7 @@ enum User {
     Username,
     Password,
     Balance,
+    Verified,
 }
 
 #[derive(Iden)]

@@ -1,11 +1,16 @@
-use actix_web::{get, post, web, Responder, HttpResponse};
-use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
+use actix_web::{error, get, post, web, HttpResponse, Responder};
+use dotenvy::dotenv;
+use lettre::message::Mailbox;
+use lettre::transport::smtp::authentication::{Credentials, Mechanism};
+use lettre::transport::smtp::PoolConfig;
+use lettre::{Message, SmtpTransport, Transport};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
-use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
+use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
 use nanoid::nanoid;
 
-use entity::{user};
-use entity::prelude::{User};
+use entity::prelude::User;
+use entity::user;
 
 use crate::appstate::AppState;
 
@@ -15,9 +20,9 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
     let user = user.into_inner();
 
     let user_query = User::find()
-    .filter(user::Column::Username.eq(user.username))
-    .one(conn)
-    .await;
+        .filter(user::Column::Username.eq(user.username))
+        .one(conn)
+        .await;
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
@@ -46,9 +51,9 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
     let user = user.into_inner();
 
     let user_query = User::find()
-    .filter(user::Column::Username.eq(&user.username))
-    .one(conn)
-    .await;
+        .filter(user::Column::Username.eq(&user.username))
+        .one(conn)
+        .await;
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
@@ -78,4 +83,40 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
     }
 
     HttpResponse::Ok().body("Registered successfully")
+}
+
+//TODO: actually make this function async
+#[get("mail_test")]
+async fn send_verification_mail(/* conn: &DatabaseConnection */) -> impl Responder {
+    let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse();
+    let to = "<piotrekjakobczyk1@gmail.com>".parse();
+
+    if from.is_err() || to.is_err() {
+        return HttpResponse::InternalServerError().body("Internal Server Error");
+    }
+
+    let mail = Message::builder()
+        .from(from.unwrap())
+        .to(to.unwrap())
+        .subject("Twój kod do kantyny")
+        .body(String::from("test email"));
+
+    if mail.is_err() {
+        return HttpResponse::InternalServerError().body("Internal Server Error");
+    }
+    let mail = &mail.unwrap();
+
+    let smtp = SmtpTransport::starttls_relay("mikut.dev")
+        .unwrap()
+        .credentials(Credentials::new(
+            "kantyna.noreply@mikut.dev".to_owned(),
+            dotenvy::var("EMAIL_PASS")
+                .expect("NO EMAIL_PASS val provided in .evn")
+                .to_string(),
+        ))
+        .authentication(vec![Mechanism::Plain])
+        .pool_config(PoolConfig::new().max_size(20))
+        .build();
+
+    HttpResponse::Ok().body("Ok")
 }

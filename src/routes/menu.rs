@@ -16,8 +16,8 @@ async fn get_menu_today() -> actix_web::Result<impl Responder> {
     Ok(web::Json(menu[curr_day].clone()))
 }
 
-#[get("/day/{day}")]
-async fn get_menu_day(day: web::Path<u32>) -> actix_web::Result<impl Responder> {
+#[get("/day/{day:[0-9]}")]
+async fn get_menu_day(day: web::Path<u8>) -> actix_web::Result<impl Responder> {
     let day = day.into_inner().min(5) as usize;
     let menu = scrape_menu().await?;
     Ok(web::Json(menu[day].clone()))

@@ -22,6 +22,7 @@ async fn main() -> std::io::Result<()> {
                     web::scope("/user")
                         .service(login)
                         .service(register)
+                        .service(send_verification_mail),
                 )
                 .service(
                     web::scope("/menu")
