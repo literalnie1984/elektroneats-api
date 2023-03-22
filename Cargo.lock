@@ -498,9 +498,9 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9df288bec72232f78c1ec5fe4e8f1d108aa0265476e93097593c803c8c02062a"
 dependencies = [
- "base64",
+ "base64 0.21.0",
  "blowfish",
- "getrandom",
+ "getrandom 0.2.8",
  "subtle",
  "zeroize",
 ]
@@ -1512,11 +1512,11 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "bcrypt",
+ "chrono",
  "dotenvy",
  "entity",
  "migration",
  "nanoid",
- "chrono",
  "scraper",
  "sea-orm",
  "serde",
@@ -1700,7 +1700,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
 dependencies = [
- "rand",
+ "rand 0.8.5",
 ]
 
 [[package]]
