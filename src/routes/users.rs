@@ -1,56 +1,81 @@
-use actix_web::{post, web, HttpResponse, Responder};
-use entity::prelude::{Order, User};
-use entity::{order, user};
-use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait, ModelTrait};
+use actix_web::{get, post, web, Responder, HttpResponse};
+use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::AppState;
+use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
+use nanoid::nanoid;
 
-#[post("/get-orders/{user_id}")]
-async fn get_all_orders_for_user(
-    user_id: web::Path<i32>,
-    data: web::Data<AppState>,
-) -> impl Responder {
-    let user_id = user_id.into_inner();
+use entity::{user};
+use entity::prelude::{User};
+
+use crate::appstate::AppState;
+
+#[post("/login")]
+async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
+    let user = user.into_inner();
 
-    let user = User::find_by_id(user_id).one(conn).await.unwrap().unwrap();
-    let orders = user.find_related(Order).all(conn).await.unwrap();
+    let user_query = User::find()
+    .filter(user::Column::Username.eq(user.username))
+    .one(conn)
+    .await;
 
-    HttpResponse::Ok().json(orders)
-}
-
-#[post("/add-order")]
-async fn add_order(order: web::Json<order::Model>, data: web::Data<AppState>) -> impl Responder {
-    let conn = &data.conn;
-
-    let order = order.into_inner();
-
-    order::ActiveModel {
-        user_id: sea_orm::ActiveValue::set(order.user_id),
-        product_id: ActiveValue::set(order.product_id),
-        ..Default::default()
+    if let Err(error) = user_query {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
     }
-    .save(conn)
-    .await
-    .unwrap();
 
-    HttpResponse::Ok().body("Hello world")
+    let user_query = user_query.unwrap();
+
+    if user_query.is_none() {
+        return HttpResponse::BadRequest().body("Account does not exist");
+    }
+
+    let result = verify(&user.password, &user_query.unwrap().password).unwrap();
+
+    if result {
+        HttpResponse::Ok().body("Good credentials")
+    } else {
+        HttpResponse::Unauthorized().body("Invalid credentials")
+    }
 }
 
-#[post("/add")]
-async fn add_user(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
+#[post("/register")]
+async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
 
     let user = user.into_inner();
 
-    user::ActiveModel {
-        username: ActiveValue::set(user.username),
-        password: ActiveValue::set(user.password),
+    let user_query = User::find()
+    .filter(user::Column::Username.eq(&user.username))
+    .one(conn)
+    .await;
+
+    if let Err(error) = user_query {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    let user_query = user_query.unwrap();
+    if user_query.is_some() {
+        return HttpResponse::BadRequest().body("Account already exists");
+    }
+
+    let salt = nanoid!(16);
+    let salt_copy: [u8; 16] = salt.as_bytes().try_into().unwrap();
+    let hashed_pass = hash_with_salt(user.password.as_bytes(), DEFAULT_COST, salt_copy).unwrap();
+
+    let result = user::ActiveModel {
+        username: Set(user.username),
+        password: Set(hashed_pass.to_string()),
         ..Default::default()
     }
     .save(conn)
-    .await
-    .unwrap();
+    .await;
 
-    HttpResponse::Ok().body("Hello world")
+    if let Err(error) = result {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    HttpResponse::Ok().body("Registered successfully")
 }
