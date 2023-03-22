@@ -1527,6 +1527,7 @@ dependencies = [
  "actix-web",
  "bcrypt",
  "chrono",
+ "derive_more",
  "dotenvy",
  "entity",
  "jsonwebtoken",
@@ -1535,6 +1536,7 @@ dependencies = [
  "scraper",
  "sea-orm",
  "serde",
+ "serde_json",
  "ureq",
 ]
 
