@@ -1,4 +1,6 @@
 use actix_web::{get, post, web, Responder, HttpResponse, FromRequest};
+use chrono::Utc;
+use jsonwebtoken::{encode, Header, EncodingKey, DecodingKey, decode, Validation};
 use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
 
 use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
@@ -6,21 +8,60 @@ use nanoid::nanoid;
 
 use entity::{user};
 use entity::prelude::{User};
+use serde::{Serialize, Deserialize};
 
 use crate::appstate::AppState;
 
+const JWT_SECRET: &[u8] = "secret".as_bytes();
+
 struct AuthUser {
-    id: u32,
+    id: i32,
 }
+use actix_web::http::header;
 
 impl FromRequest for AuthUser{
     type Error = actix_web::Error;
     type Future = std::future::Ready<Result<Self, Self::Error>>;
 
     fn from_request(req: &actix_web::HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
-        let user_id = req.headers().get("user_id").unwrap().to_str().unwrap().parse::<u32>().unwrap();
+        let auth_header = req.headers().get(header::AUTHORIZATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
+
+        let token = auth_header.split("Bearer ").collect::<Vec<&str>>()[1];
+        let user_id = decode_jwt_token(token.to_string());
         std::future::ready(Ok(AuthUser { id: user_id }))
     }
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    exp: usize,
+}
+
+pub fn create_jwt(uid: i32) -> String {
+    let expiration = Utc::now()
+        .checked_add_signed(chrono::Duration::seconds(60))
+        .expect("valid timestamp")
+        .timestamp();
+
+    let claims = Claims {
+        sub: uid.to_string(),
+        exp: expiration as usize,
+    };
+
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(JWT_SECRET)).unwrap()
+}
+
+fn decode_jwt_token(token: String) -> i32{
+    let decoded = decode::<Claims>(
+        &token,
+        &DecodingKey::from_secret(JWT_SECRET),
+        &Validation::default()
+    ).unwrap();
+
+    return decoded.claims.sub.parse::<i32>().unwrap();
 }
 
 #[get("/get-user-data")]
@@ -68,11 +109,12 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
     if user_query.is_none() {
         return HttpResponse::BadRequest().body("Account does not exist");
     }
-
-    let result = verify(&user.password, &user_query.unwrap().password).unwrap();
+    let user_query = user_query.unwrap();
+    let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        HttpResponse::Ok().body("Good credentials")
+        let token = create_jwt(user_query.id);
+        HttpResponse::Ok().body(token)
     } else {
         HttpResponse::Unauthorized().body("Invalid credentials")
     }
