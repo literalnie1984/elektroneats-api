@@ -79,8 +79,3 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     HttpResponse::Ok().body("Registered successfully")
 }
-
-#[get("/is_logged")]
-async fn is_logged() -> impl Responder {
-    "TODO"
-}
