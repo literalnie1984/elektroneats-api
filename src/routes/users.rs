@@ -20,7 +20,7 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
     let user = user.into_inner();
 
     let user_query = User::find()
-        .filter(user::Column::Username.eq(user.username))
+        .filter(user::Column::Email.eq(user.email))
         .one(conn)
         .await;
 
@@ -51,7 +51,7 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
     let user = user.into_inner();
 
     let user_query = User::find()
-        .filter(user::Column::Username.eq(&user.username))
+        .filter(user::Column::Email.eq(&user.email))
         .one(conn)
         .await;
 
@@ -71,6 +71,7 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     let result = user::ActiveModel {
         username: Set(user.username),
+        email: Set(user.email.clone()),
         password: Set(hashed_pass.to_string()),
         ..Default::default()
     }
@@ -82,14 +83,13 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
         return HttpResponse::InternalServerError().body("Internal server error");
     }
 
-    HttpResponse::Ok().body("Registered successfully")
+    send_verification_mail(&user.email).await
 }
 
 //TODO: actually make this function async
-#[get("mail_test")]
-async fn send_verification_mail(/* conn: &DatabaseConnection */) -> impl Responder {
+async fn send_verification_mail(email: &str) -> HttpResponse {
     let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse();
-    let to = "<piotrekjakobczyk1@gmail.com>".parse();
+    let to = email.parse();
 
     if from.is_err() || to.is_err() {
         return HttpResponse::InternalServerError().body("Internal Server Error");
@@ -118,5 +118,11 @@ async fn send_verification_mail(/* conn: &DatabaseConnection */) -> impl Respond
         .pool_config(PoolConfig::new().max_size(20))
         .build();
 
-    HttpResponse::Ok().body("Ok")
+    let send_status = smtp.send(mail);
+
+    if send_status.is_err() {
+        HttpResponse::InternalServerError().body("Internal server error")
+    } else {
+        HttpResponse::Ok().body("Registered successfully; email send")
+    }
 }

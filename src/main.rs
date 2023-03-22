@@ -18,12 +18,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new().app_data(web::Data::new(state.clone())).service(
             web::scope("/api")
-                .service(
-                    web::scope("/user")
-                        .service(login)
-                        .service(register)
-                        .service(send_verification_mail),
-                )
+                .service(web::scope("/user").service(login).service(register))
                 .service(
                     web::scope("/menu")
                         .service(get_menu)

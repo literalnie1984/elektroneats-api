@@ -18,14 +18,15 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(User::Username)
-                            .string()
-                            .unique_key()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(User::Email).string().unique_key().not_null())
+                    .col(ColumnDef::new(User::Username).string().not_null())
                     .col(ColumnDef::new(User::Password).string().not_null())
-                    .col(ColumnDef::new(User::Balance).integer().not_null())
+                    .col(
+                        ColumnDef::new(User::Balance)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .col(
                         ColumnDef::new(User::Verified)
                             .boolean()
@@ -82,6 +83,7 @@ enum User {
     Table,
     Id,
     Username,
+    Email,
     Password,
     Balance,
     Verified,
