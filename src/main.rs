@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
 use actix_web::{web, App, HttpServer};
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
@@ -13,12 +16,21 @@ async fn main() -> std::io::Result<()> {
     let connection = sea_orm::Database::connect(&db_url).await.unwrap();
     Migrator::up(&connection, None).await.unwrap();
 
-    let state = AppState { conn: connection };
+    //create outside of closure so workers can share state
+    let state = web::Data::new(AppState {
+        conn: connection,
+        activators: Arc::new(RwLock::new(HashMap::new())),
+    });
 
     HttpServer::new(move || {
-        App::new().app_data(web::Data::new(state.clone())).service(
+        App::new().app_data(state.clone()).service(
             web::scope("/api")
-                .service(web::scope("/user").service(login).service(register))
+                .service(
+                    web::scope("/user")
+                        .service(login)
+                        .service(register)
+                        .service(activate_account),
+                )
                 .service(
                     web::scope("/menu")
                         .service(get_menu)

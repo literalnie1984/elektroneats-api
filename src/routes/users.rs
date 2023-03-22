@@ -1,10 +1,9 @@
-use actix_web::{error, get, post, web, HttpResponse, Responder};
-use dotenvy::dotenv;
-use lettre::message::Mailbox;
+use actix_web::web::Path;
+use actix_web::{get, post, web, HttpResponse, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use lettre::{Message, SmtpTransport, Transport};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
 use nanoid::nanoid;
@@ -12,13 +11,12 @@ use nanoid::nanoid;
 use entity::prelude::User;
 use entity::user;
 
-use crate::appstate::AppState;
+use crate::appstate::{ActivatorsVec, AppState};
 
 #[post("/login")]
 async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
     let user = user.into_inner();
-
     let user_query = User::find()
         .filter(user::Column::Email.eq(user.email))
         .one(conn)
@@ -83,11 +81,44 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
         return HttpResponse::InternalServerError().body("Internal server error");
     }
 
-    send_verification_mail(&user.email).await
+    send_verification_mail(&user.email, &data.activators).await
+}
+
+//definitely refactor this
+#[get("/activate/{token}")]
+async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> HttpResponse {
+    let tokens = data.activators.read().unwrap();
+    if let Some(email) = tokens.get(&token.into_inner()) {
+        let conn = &data.conn;
+        let user_query = User::find()
+            .filter(user::Column::Email.eq(email))
+            .one(conn)
+            .await;
+
+        if let Err(error) = user_query {
+            eprintln!("Database error: {}", error);
+            return HttpResponse::InternalServerError().body("Internal server error");
+        }
+
+        if let Some(user) = user_query.unwrap() {
+            let mut user: user::ActiveModel = user.into();
+            user.verified = Set(true as i8);
+
+            if let Err(err) = user.update(conn).await {
+                eprintln!("Database error: {}", err);
+                return HttpResponse::InternalServerError().body("Internal server error");
+            }
+            HttpResponse::Ok().body("account verified successfully")
+        } else {
+            return HttpResponse::InternalServerError().body("Internal server error");
+        }
+    } else {
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
 }
 
 //TODO: actually make this function async
-async fn send_verification_mail(email: &str) -> HttpResponse {
+async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> HttpResponse {
     let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse();
     let to = email.parse();
 
@@ -95,11 +126,19 @@ async fn send_verification_mail(email: &str) -> HttpResponse {
         return HttpResponse::InternalServerError().body("Internal Server Error");
     }
 
+    //add email - activation_link combo to current app state
+    let mut activators = activators.write().unwrap();
+    let activation_link = nanoid!();
+    (*activators).insert(activation_link.clone(), email.into());
+
     let mail = Message::builder()
         .from(from.unwrap())
         .to(to.unwrap())
         .subject("Twój kod do kantyny")
-        .body(String::from("test email"));
+        .body(format!(
+            "http://127.0.0.1:4765/api/user/activate/{}",
+            activation_link
+        ));
 
     if mail.is_err() {
         return HttpResponse::InternalServerError().body("Internal Server Error");
