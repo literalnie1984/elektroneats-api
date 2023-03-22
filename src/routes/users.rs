@@ -10,6 +10,7 @@ use entity::prelude::{User};
 
 use crate::appstate::AppState;
 
+use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
 use crate::jwt_auth::AuthUser;
 
@@ -24,22 +25,22 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
     let user_query = user_query.unwrap();
 
     if user_query.is_none() {
-        return HttpResponse::BadRequest().body("Account does not exist");
+        return Err(ServiceError::BadRequest("Account does not exist".to_string()));
     }
 
     let user = user_query.unwrap();
 
-    HttpResponse::Ok().body(format!("User data: {}", user.username))
+    Ok(format!("User data: {}", user.username))
 }
 
 #[post("/login")]
-async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
+async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> Result<String, ServiceError> {
     let conn = &data.conn;
     let user = user.into_inner();
 
@@ -50,13 +51,13 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
     let user_query = user_query.unwrap();
 
     if user_query.is_none() {
-        return HttpResponse::BadRequest().body("Account does not exist");
+        return Err(ServiceError::BadRequest("Account does not exist".to_string()));
     }
     let user_query = user_query.unwrap();
     let result = verify(&user.password, &user_query.password).unwrap();
@@ -67,13 +68,13 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);
-                return HttpResponse::InternalServerError().body("Internal server error");
+                return Err(ServiceError::InternalError);
             }
         };
-        
-        HttpResponse::Ok().body(token)
+
+        Ok(token)
     } else {
-        HttpResponse::Unauthorized().body("Invalid credentials")
+        Err(ServiceError::Unauthorized("Invalid credentials".to_string()))
     }
 }
 
@@ -90,12 +91,12 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
     let user_query = user_query.unwrap();
     if user_query.is_some() {
-        return HttpResponse::BadRequest().body("Account already exists");
+        return Err(ServiceError::BadRequest("Account already exists".to_string()));
     }
 
     let salt = nanoid!(16);
@@ -112,8 +113,8 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     if let Err(error) = result {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
-    HttpResponse::Ok().body("Registered successfully")
+    Ok("Account created successfully".to_string())
 }
