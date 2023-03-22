@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, Responder, HttpResponse};
+use actix_web::{get, post, web, Responder, HttpResponse, FromRequest};
 use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
 
 use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
@@ -8,6 +8,45 @@ use entity::{user};
 use entity::prelude::{User};
 
 use crate::appstate::AppState;
+
+struct AuthUser {
+    id: u32,
+}
+
+impl FromRequest for AuthUser{
+    type Error = actix_web::Error;
+    type Future = std::future::Ready<Result<Self, Self::Error>>;
+
+    fn from_request(req: &actix_web::HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
+        let user_id = req.headers().get("user_id").unwrap().to_str().unwrap().parse::<u32>().unwrap();
+        std::future::ready(Ok(AuthUser { id: user_id }))
+    }
+}
+
+#[get("/get-user-data")]
+async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
+    let conn = &data.conn;
+
+    let user_query = User::find()
+    .filter(user::Column::Id.eq(user.id))
+    .one(conn)
+    .await;
+
+    if let Err(error) = user_query {
+        eprintln!("Database error: {}", error);
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    let user_query = user_query.unwrap();
+
+    if user_query.is_none() {
+        return HttpResponse::BadRequest().body("Account does not exist");
+    }
+
+    let user = user_query.unwrap();
+
+    HttpResponse::Ok().body(format!("User data: {}", user.username))
+}
 
 #[post("/login")]
 async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {

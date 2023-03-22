@@ -22,6 +22,7 @@ async fn main() -> std::io::Result<()> {
                     web::scope("/user")
                         .service(login)
                         .service(register)
+                        .service(get_user_data)
                 )
                 .service(
                     web::scope("/menu")
