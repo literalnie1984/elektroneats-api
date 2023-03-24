@@ -27,6 +27,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(UserDinnerOrders::DinnerId)
                             .integer()
+                            .unique_key()
                             .unsigned()
                             .not_null(),
                     )
