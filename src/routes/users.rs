@@ -1,8 +1,11 @@
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
+use lettre::transport::smtp::client::AsyncSmtpConnection;
 use lettre::transport::smtp::PoolConfig;
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::{
+    AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message, SmtpTransport, Transport,
+};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -198,25 +201,23 @@ async fn send_verification_mail(
     if mail.is_err() {
         return Err(ServiceError::InternalError);
     }
-    let mail = &mail.unwrap();
+    let mail = mail.unwrap();
 
-    let smtp = SmtpTransport::starttls_relay("mikut.dev")
-        .unwrap()
-        .credentials(Credentials::new(
-            "kantyna.noreply@mikut.dev".to_owned(),
-            dotenvy::var("EMAIL_PASS")
-                .expect("NO EMAIL_PASS val provided in .evn")
-                .to_string(),
-        ))
-        .authentication(vec![Mechanism::Plain])
-        .pool_config(PoolConfig::new().max_size(20))
-        .build();
+    let smtp: AsyncSmtpTransport<AsyncStd1Executor> =
+        AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay("mikut.dev")
+            .unwrap()
+            .credentials(Credentials::new(
+                "kantyna.noreply@mikut.dev".to_owned(),
+                dotenvy::var("EMAIL_PASS")
+                    .expect("NO EMAIL_PASS val provided in .evn")
+                    .to_string(),
+            ))
+            .authentication(vec![Mechanism::Plain])
+            .pool_config(PoolConfig::new().max_size(20))
+            .build();
 
-    let send_status = smtp.send(mail);
-
-    if send_status.is_err() {
-        return Err(ServiceError::InternalError);
-    } else {
-        Ok("Registered successfully; email send".to_string())
+    match smtp.send(mail).await {
+        Err(_) => Err(ServiceError::InternalError),
+        Ok(_) => Ok("Registered successfully; email send".to_string()),
     }
 }
