@@ -2,6 +2,7 @@ use async_std::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
@@ -11,6 +12,10 @@ use kantyna_api::appstate::AppState;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_BACKTRACE", "1");
+    env_logger::init();
+
     dotenvy::dotenv().expect(".env file not found");
     let db_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
 
@@ -24,7 +29,12 @@ async fn main() -> std::io::Result<()> {
     });
 
     HttpServer::new(move || {
-        App::new().app_data(state.clone()).service(
+        let logger = Logger::default();
+    
+        App::new()
+        .wrap(logger)
+        .app_data(state.clone())
+        .service(
             web::scope("/api")
                 .service(
                     web::scope("/user")

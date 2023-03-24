@@ -20,6 +20,8 @@ use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
 use crate::jwt_auth::AuthUser;
 
+use log::error;
+
 #[get("/get-user-data")]
 async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
@@ -30,7 +32,7 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
         .await;
 
     if let Err(error) = user_query {
-        eprintln!("Database error: {}", error);
+        error!("Database error: {}", error);
         return Err(ServiceError::InternalError);
     }
 
@@ -60,7 +62,7 @@ async fn login(
         .await;
 
     if let Err(error) = user_query {
-        eprintln!("Database error: {}", error);
+        error!("Database error: {}", error);
         return Err(ServiceError::InternalError);
     }
 
@@ -103,7 +105,7 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
         .await;
 
     if let Err(error) = user_query {
-        eprintln!("Database error: {}", error);
+        error!("Database error: {}", error);
         return Err(ServiceError::InternalError);
     }
 
@@ -128,7 +130,7 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
     .await;
 
     if let Err(error) = result {
-        eprintln!("Database error: {}", error);
+        error!("Database error: {}", error);
         return Err(ServiceError::InternalError);
     }
 
@@ -150,7 +152,7 @@ async fn activate_account(
             .await;
 
         if let Err(error) = user_query {
-            eprintln!("Database error: {}", error);
+            error!("Database error: {}", error);
             return Err(ServiceError::InternalError);
         }
 
@@ -159,7 +161,7 @@ async fn activate_account(
             user.verified = Set(true as i8);
 
             if let Err(err) = user.update(conn).await {
-                eprintln!("Database error: {}", err);
+                error!("Database error: {}", err);
                 return Err(ServiceError::InternalError);
             }
 
