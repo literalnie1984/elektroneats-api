@@ -1,10 +1,9 @@
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-use lettre::transport::smtp::client::AsyncSmtpConnection;
 use lettre::transport::smtp::PoolConfig;
 use lettre::{
-    AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message, SmtpTransport, Transport,
+    AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message,
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
@@ -13,22 +12,15 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
-use serde::{Serialize, Deserialize};
 
 use crate::appstate::{ActivatorsVec, AppState};
 
 use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
 use crate::jwt_auth::AuthUser;
+use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
 use log::error;
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct UserChangePassword {
-    old_password: String,
-    new_password: String,
-}
 
 #[post("/change-password")]
 async fn change_password(
@@ -108,7 +100,7 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
 
 #[post("/login")]
 async fn login(
-    user: web::Json<user::Model>,
+    user: web::Json<UserLogin>,
     data: web::Data<AppState>,
 ) -> Result<String, ServiceError> {
     let conn = &data.conn;
@@ -151,7 +143,7 @@ async fn login(
 }
 
 #[post("/register")]
-async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
+async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
 
     let user = user.into_inner();
