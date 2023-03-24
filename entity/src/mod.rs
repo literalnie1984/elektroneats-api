@@ -2,5 +2,13 @@
 
 pub mod prelude;
 
-pub mod order;
+pub mod dinner;
+pub mod dinner_orders;
+pub mod extras;
+pub mod extras_dinner;
+pub mod extras_order;
+pub mod sea_orm_active_enums;
+pub mod shop;
+pub mod shop_orders;
 pub mod user;
+pub mod user_dinner_orders;
