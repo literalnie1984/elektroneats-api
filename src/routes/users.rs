@@ -13,6 +13,7 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
+use serde::{Serialize, Deserialize};
 
 use crate::appstate::{ActivatorsVec, AppState};
 
@@ -21,6 +22,62 @@ use crate::jwt_auth::create_jwt;
 use crate::jwt_auth::AuthUser;
 
 use log::error;
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UserChangePassword {
+    old_password: String,
+    new_password: String,
+}
+
+#[post("/change-password")]
+async fn change_password(
+    user: AuthUser,
+    data: web::Data<AppState>,
+    pass_data: web::Json<UserChangePassword>,
+) -> Result<String, ServiceError> {
+    let conn = &data.conn;
+
+    let user_query = User::find()
+        .filter(user::Column::Id.eq(user.id))
+        .one(conn)
+        .await;
+
+    let user_query = match user_query {
+        Ok(l) => l,
+        Err(error) => {
+            error!("Database error: {}", error);
+            return Err(ServiceError::InternalError)
+        },
+    };
+
+    let user = match user_query {
+        Some(l) => l,
+        None => return Err(ServiceError::BadRequest(
+            "Account does not exist".to_string(),
+        )),
+    };
+
+    if !verify(&pass_data.old_password, &user.password).unwrap(){
+        return Err(ServiceError::BadRequest(
+            "Old password is incorrect".to_string(),
+        ));
+    }
+
+    let salt = nanoid!(16);
+    let salt_copy: [u8; 16] = salt.as_bytes().try_into().unwrap();
+    let new_password = hash_with_salt(&pass_data.new_password, DEFAULT_COST, salt_copy).unwrap();
+
+    let mut user: user::ActiveModel = user.into();
+    user.password = Set(new_password.to_string());
+    match user.update(conn).await{
+        Ok(_) => Ok("Password changed".to_string()),
+        Err(error) => {
+            error!("Database error: {}", error);
+            return Err(ServiceError::InternalError)
+        },
+    }
+}
 
 #[get("/get-user-data")]
 async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
