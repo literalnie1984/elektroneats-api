@@ -1,4 +1,5 @@
 use async_std::sync::RwLock;
+use lettre::transport::smtp::extension::ServerInfo;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -41,7 +42,8 @@ async fn main() -> std::io::Result<()> {
                         .service(login)
                         .service(register)
                         .service(activate_account)
-                        .service(get_user_data),
+                        .service(get_user_data)
+                        .service(change_password),
                 )
                 .service(
                     web::scope("/menu")
