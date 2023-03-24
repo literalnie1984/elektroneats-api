@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use actix_web::{web, App, HttpServer};
+use kantyna_api::errors::ServiceError;
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
@@ -29,7 +30,8 @@ async fn main() -> std::io::Result<()> {
                     web::scope("/user")
                         .service(login)
                         .service(register)
-                        .service(activate_account),
+                        .service(activate_account)
+                        .service(get_user_data),
                 )
                 .service(
                     web::scope("/menu")

@@ -5,7 +5,11 @@ use lettre::transport::smtp::PoolConfig;
 use lettre::{Message, SmtpTransport, Transport};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
+use actix_web::{get, post, web, Responder, HttpResponse};
+
+use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
+
+use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
 use nanoid::nanoid;
 
 use entity::prelude::User;
@@ -13,8 +17,37 @@ use entity::user;
 
 use crate::appstate::{ActivatorsVec, AppState};
 
+use crate::errors::ServiceError;
+use crate::jwt_auth::create_jwt;
+use crate::jwt_auth::AuthUser;
+
+#[get("/get-user-data")]
+async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
+    let conn = &data.conn;
+
+    let user_query = User::find()
+    .filter(user::Column::Id.eq(user.id))
+    .one(conn)
+    .await;
+
+    if let Err(error) = user_query {
+        eprintln!("Database error: {}", error);
+        return Err(ServiceError::InternalError);
+    }
+
+    let user_query = user_query.unwrap();
+
+    if user_query.is_none() {
+        return Err(ServiceError::BadRequest("Account does not exist".to_string()));
+    }
+
+    let user = user_query.unwrap();
+
+    Ok(format!("User data: {}", user.username))
+}
+
 #[post("/login")]
-async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
+async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> Result<String, ServiceError> {
     let conn = &data.conn;
     let user = user.into_inner();
     let user_query = User::find()
@@ -24,21 +57,30 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl 
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
     let user_query = user_query.unwrap();
 
     if user_query.is_none() {
-        return HttpResponse::BadRequest().body("Account does not exist");
+        return Err(ServiceError::BadRequest("Account does not exist".to_string()));
     }
-
-    let result = verify(&user.password, &user_query.unwrap().password).unwrap();
+    let user_query = user_query.unwrap();
+    let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        HttpResponse::Ok().body("Good credentials")
+        let token = 
+        match create_jwt(user_query.id){
+            Ok(token) => token,
+            Err(error) => {
+                eprintln!("Error creating token: {}", error);
+                return Err(ServiceError::InternalError);
+            }
+        };
+
+        Ok(token)
     } else {
-        HttpResponse::Unauthorized().body("Invalid credentials")
+        Err(ServiceError::Unauthorized("Invalid credentials".to_string()))
     }
 }
 
@@ -55,12 +97,12 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
     let user_query = user_query.unwrap();
     if user_query.is_some() {
-        return HttpResponse::BadRequest().body("Account already exists");
+        return Err(ServiceError::BadRequest("Account already exists".to_string()));
     }
 
     let salt = nanoid!(16);
@@ -78,7 +120,7 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     if let Err(error) = result {
         eprintln!("Database error: {}", error);
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 
     send_verification_mail(&user.email, &data.activators).await
@@ -86,7 +128,7 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
 //definitely refactor this
 #[get("/activate/{token}")]
-async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> HttpResponse {
+async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> Result<String, ServiceError> {
     let tokens = data.activators.read().unwrap();
     if let Some(email) = tokens.get(&token.into_inner()) {
         let conn = &data.conn;
@@ -97,7 +139,7 @@ async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> Htt
 
         if let Err(error) = user_query {
             eprintln!("Database error: {}", error);
-            return HttpResponse::InternalServerError().body("Internal server error");
+            return Err(ServiceError::InternalError);
         }
 
         if let Some(user) = user_query.unwrap() {
@@ -106,24 +148,25 @@ async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> Htt
 
             if let Err(err) = user.update(conn).await {
                 eprintln!("Database error: {}", err);
-                return HttpResponse::InternalServerError().body("Internal server error");
+                return Err(ServiceError::InternalError);
             }
-            HttpResponse::Ok().body("account verified successfully")
+
+            "account verified successfully".to_string()
         } else {
-            return HttpResponse::InternalServerError().body("Internal server error");
+            return Err(ServiceError::InternalError);
         }
     } else {
-        return HttpResponse::InternalServerError().body("Internal server error");
+        return Err(ServiceError::InternalError);
     }
 }
 
 //TODO: actually make this function async
-async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> HttpResponse {
+async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> Result<String, ServiceError> {
     let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse();
     let to = email.parse();
 
     if from.is_err() || to.is_err() {
-        return HttpResponse::InternalServerError().body("Internal Server Error");
+        return Err(ServiceError::InternalError);
     }
 
     //add email - activation_link combo to current app state
@@ -141,7 +184,7 @@ async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> Http
         ));
 
     if mail.is_err() {
-        return HttpResponse::InternalServerError().body("Internal Server Error");
+        return Err(ServiceError::InternalError);
     }
     let mail = &mail.unwrap();
 
@@ -160,8 +203,8 @@ async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> Http
     let send_status = smtp.send(mail);
 
     if send_status.is_err() {
-        HttpResponse::InternalServerError().body("Internal server error")
+        return Err(ServiceError::InternalError);
     } else {
-        HttpResponse::Ok().body("Registered successfully; email send")
+        "Registered successfully; email send".to_string()
     }
 }
