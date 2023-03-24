@@ -1,8 +1,6 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, sync::Arc};
 
+use async_std::sync::RwLock;
 use sea_orm::DatabaseConnection;
 
 pub type ActivatorsVec = Arc<RwLock<HashMap<String, String>>>;

@@ -5,7 +5,7 @@ use lettre::transport::smtp::PoolConfig;
 use lettre::{Message, SmtpTransport, Transport};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
+use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
 use nanoid::nanoid;
 
 use entity::prelude::User;
@@ -22,9 +22,9 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
     let conn = &data.conn;
 
     let user_query = User::find()
-    .filter(user::Column::Id.eq(user.id))
-    .one(conn)
-    .await;
+        .filter(user::Column::Id.eq(user.id))
+        .one(conn)
+        .await;
 
     if let Err(error) = user_query {
         eprintln!("Database error: {}", error);
@@ -34,7 +34,9 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
     let user_query = user_query.unwrap();
 
     if user_query.is_none() {
-        return Err(ServiceError::BadRequest("Account does not exist".to_string()));
+        return Err(ServiceError::BadRequest(
+            "Account does not exist".to_string(),
+        ));
     }
 
     let user = user_query.unwrap();
@@ -43,7 +45,10 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
 }
 
 #[post("/login")]
-async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> Result<String, ServiceError> {
+async fn login(
+    user: web::Json<user::Model>,
+    data: web::Data<AppState>,
+) -> Result<String, ServiceError> {
     let conn = &data.conn;
     let user = user.into_inner();
     let user_query = User::find()
@@ -59,14 +64,15 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> Resul
     let user_query = user_query.unwrap();
 
     if user_query.is_none() {
-        return Err(ServiceError::BadRequest("Account does not exist".to_string()));
+        return Err(ServiceError::BadRequest(
+            "Account does not exist".to_string(),
+        ));
     }
     let user_query = user_query.unwrap();
     let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        let token = 
-        match create_jwt(user_query.id){
+        let token = match create_jwt(user_query.id) {
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);
@@ -76,7 +82,9 @@ async fn login(user: web::Json<user::Model>, data: web::Data<AppState>) -> Resul
 
         Ok(token)
     } else {
-        Err(ServiceError::Unauthorized("Invalid credentials".to_string()))
+        Err(ServiceError::Unauthorized(
+            "Invalid credentials".to_string(),
+        ))
     }
 }
 
@@ -98,7 +106,9 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
     let user_query = user_query.unwrap();
     if user_query.is_some() {
-        return Err(ServiceError::BadRequest("Account already exists".to_string()));
+        return Err(ServiceError::BadRequest(
+            "Account already exists".to_string(),
+        ));
     }
 
     let salt = nanoid!(16);
@@ -124,8 +134,11 @@ async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> im
 
 //definitely refactor this
 #[get("/activate/{token}")]
-async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> Result<String, ServiceError> {
-    let tokens = data.activators.read().unwrap();
+async fn activate_account(
+    token: Path<String>,
+    data: web::Data<AppState>,
+) -> Result<String, ServiceError> {
+    let tokens = data.activators.read().await;
     if let Some(email) = tokens.get(&token.into_inner()) {
         let conn = &data.conn;
         let user_query = User::find()
@@ -157,7 +170,10 @@ async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> Res
 }
 
 //TODO: actually make this function async
-async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> Result<String, ServiceError> {
+async fn send_verification_mail(
+    email: &str,
+    activators: &ActivatorsVec,
+) -> Result<String, ServiceError> {
     let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse();
     let to = email.parse();
 
@@ -166,7 +182,7 @@ async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> Resu
     }
 
     //add email - activation_link combo to current app state
-    let mut activators = activators.write().unwrap();
+    let mut activators = activators.write().await;
     let activation_link = nanoid!();
     (*activators).insert(activation_link.clone(), email.into());
 
