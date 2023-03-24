@@ -1557,11 +1557,8 @@ dependencies = [
  "derive_more",
  "dotenvy",
  "entity",
-<<<<<<< HEAD
- "lettre",
-=======
  "jsonwebtoken",
->>>>>>> user-auth
+ "lettre",
  "migration",
  "nanoid",
  "scraper",

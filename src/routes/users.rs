@@ -1,13 +1,9 @@
 use actix_web::web::Path;
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use lettre::{Message, SmtpTransport, Transport};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
-
-use actix_web::{get, post, web, Responder, HttpResponse};
-
-use sea_orm::{Set, ActiveModelTrait, EntityTrait, ColumnTrait, QueryFilter};
 
 use bcrypt::{hash_with_salt, DEFAULT_COST, verify};
 use nanoid::nanoid;
@@ -151,7 +147,7 @@ async fn activate_account(token: Path<String>, data: web::Data<AppState>) -> Res
                 return Err(ServiceError::InternalError);
             }
 
-            "account verified successfully".to_string()
+            Ok("account verified successfully".to_string())
         } else {
             return Err(ServiceError::InternalError);
         }
@@ -205,6 +201,6 @@ async fn send_verification_mail(email: &str, activators: &ActivatorsVec) -> Resu
     if send_status.is_err() {
         return Err(ServiceError::InternalError);
     } else {
-        "Registered successfully; email send".to_string()
+        Ok("Registered successfully; email send".to_string())
     }
 }
