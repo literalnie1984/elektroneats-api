@@ -47,7 +47,7 @@ async fn main() -> std::io::Result<()> {
                 )
                 .service(
                     web::scope("/menu")
-                        .service(get_menu)
+                        .service(get_menu_all)
                         .service(get_menu_item)
                         .service(get_menu_today)
                         .service(get_menu_day),

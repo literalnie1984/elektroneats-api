@@ -1,31 +1,16 @@
-use std::{fmt::format, mem};
+use std::mem;
 
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
-use entity::{dinner, extras_dinner, extras, prelude::{Dinner, Extras, ExtrasDinner}};
-use log::info;
-use migration::JoinType;
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, QuerySelect, RelationTrait, LoaderTrait};
+use entity::{dinner,extras, prelude::{Dinner, Extras, ExtrasDinner}};
+use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection};
 
-use crate::{scraper::scrape_menu, errors::ServiceError, appstate::AppState};
+use crate::{errors::ServiceError, appstate::AppState};
 
-#[get("/")]
-async fn get_menu() -> actix_web::Result<impl Responder> {
-    let menu = scrape_menu().await?;
-    Ok(web::Json(menu))
-}
+type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
 
-// #[get("/today")]
-// async fn get_menu_today() -> actix_web::Result<impl Responder> {
-//     let curr_day = (chrono::offset::Local::now().date_naive().weekday() as usize).min(5);
-//     let menu = scrape_menu().await?;
-//     Ok(web::Json(menu[curr_day].clone()))
-// }
-
-#[get("/today")]
-async fn get_menu_today(data: web::Data<AppState>) -> Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError> {
-    let conn = &data.conn;
-    let int_to_day = |day: usize| match day {
+async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult{
+    let int_to_day = |day: u8| match day {
         0 => "monday",
         1 => "tuesday",
         2 => "wednesday",
@@ -34,10 +19,10 @@ async fn get_menu_today(data: web::Data<AppState>) -> Result<web::Json<Vec<(dinn
         5 => "saturday",
         _ => "saturday",
     };
-    let curr_day = (chrono::offset::Local::now().date_naive().weekday() as usize).min(5);
-    let curr_day = int_to_day(curr_day);
-
-    let dinners = Dinner::find().filter(dinner::Column::WeekDay.eq(curr_day)).all(conn).await.unwrap();
+    let dinners = match day {
+        Some(day) => Dinner::find().filter(dinner::Column::WeekDay.eq(int_to_day(day))).all(conn).await.unwrap(),
+        None => Dinner::find().all(conn).await.unwrap(),
+    };
     let mut extras  = dinners.load_many_to_many(Extras, ExtrasDinner, conn).await.unwrap();
 
     let response = dinners.iter().zip(extras.iter_mut())
@@ -48,11 +33,23 @@ async fn get_menu_today(data: web::Data<AppState>) -> Result<web::Json<Vec<(dinn
     Ok(web::Json(response))
 }
 
+#[get("/")]
+async fn get_menu_all(data: web::Data<AppState>) -> MenuResult {
+    get_menu(&data.conn, None).await
+}
+
+#[get("/today")]
+async fn get_menu_today(data: web::Data<AppState>) -> MenuResult {
+    let curr_day = (chrono::offset::Local::now().date_naive().weekday() as u8).min(5);
+
+    get_menu(&data.conn, Some(curr_day)).await
+}
+
 #[get("/day/{day:[0-9]}")]
-async fn get_menu_day(day: web::Path<u8>) -> actix_web::Result<impl Responder> {
-    let day = day.into_inner().min(5) as usize;
-    let menu = scrape_menu().await?;
-    Ok(web::Json(menu[day].clone()))
+async fn get_menu_day(day: web::Path<u8>, data: web::Data<AppState>) -> MenuResult {
+    let day = day.into_inner().min(5) as u8;
+
+    get_menu(&data.conn, Some(day)).await
 }
 
 #[get("/{item_id}/")]
