@@ -1,7 +1,11 @@
+use std::fmt::format;
+
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
+use entity::{dinner, extras_dinner, extras};
+use sea_orm::{EntityTrait, QueryFilter, ColumnTrait};
 
-use crate::scraper::scrape_menu;
+use crate::{scraper::scrape_menu, errors::ServiceError, appstate::AppState};
 
 #[get("/")]
 async fn get_menu() -> actix_web::Result<impl Responder> {
@@ -9,11 +13,35 @@ async fn get_menu() -> actix_web::Result<impl Responder> {
     Ok(web::Json(menu))
 }
 
+// #[get("/today")]
+// async fn get_menu_today() -> actix_web::Result<impl Responder> {
+//     let curr_day = (chrono::offset::Local::now().date_naive().weekday() as usize).min(5);
+//     let menu = scrape_menu().await?;
+//     Ok(web::Json(menu[curr_day].clone()))
+// }
+
 #[get("/today")]
-async fn get_menu_today() -> actix_web::Result<impl Responder> {
+async fn get_menu_today(data: web::Data<AppState>) -> Result<String, ServiceError> {
+    let conn = &data.conn;
+    let int_to_day = |day: usize| match day {
+        0 => "monday",
+        1 => "tuesday",
+        2 => "wednesday",
+        3 => "thursday",
+        4 => "friday",
+        5 => "saturday",
+        _ => "saturday",
+    };
     let curr_day = (chrono::offset::Local::now().date_naive().weekday() as usize).min(5);
-    let menu = scrape_menu().await?;
-    Ok(web::Json(menu[curr_day].clone()))
+    let curr_day = int_to_day(curr_day);
+
+    let result = dinner::Entity::find()
+        .find_with_related(extras_dinner::Entity)
+        .filter(dinner::Column::WeekDay.eq(curr_day))
+        .all(conn)
+        .await.unwrap();
+
+    Ok(format!("{:#?}", result))
 }
 
 #[get("/day/{day:[0-9]}")]
