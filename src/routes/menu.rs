@@ -4,25 +4,16 @@ use actix_web::{get, web, Responder};
 use chrono::Datelike;
 use entity::{dinner,extras, prelude::{Dinner, Extras, ExtrasDinner}};
 use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection};
-use serde_json::error;
 use log::error;
 
-use crate::{errors::ServiceError, appstate::AppState};
+use crate::{errors::ServiceError, appstate::AppState, scraper::{update_menu, scrape_menu}};
 
 type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
 
 async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult{
-    let int_to_day = |day: u8| match day {
-        0 => "monday",
-        1 => "tuesday",
-        2 => "wednesday",
-        3 => "thursday",
-        4 => "friday",
-        5 => "saturday",
-        _ => "saturday",
-    };
+    
     let dinners = match day {
-        Some(day) => Dinner::find().filter(dinner::Column::WeekDay.eq(int_to_day(day))).all(conn).await.map_err(|e| {
+        Some(day) => Dinner::find().filter(dinner::Column::WeekDay.eq(day)).all(conn).await.map_err(|e| {
             error!("Database error getting menu: {}", e);
             ServiceError::InternalError
         })?,
