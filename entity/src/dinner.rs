@@ -41,19 +41,16 @@ impl Related<super::user_dinner_orders::Entity> for Entity {
     }
 }
 
-#[derive(Debug)]
-pub struct DinnerToExtras;
+impl Related<super::extras::Entity> for Entity {
+    // The final relation is Cake -> CakeFilling -> Filling
+    fn to() -> RelationDef {
+        super::extras_dinner::Relation::Extras.def()
+    }
 
-impl Linked for DinnerToExtras {
-    type FromEntity = Entity;
-
-    type ToEntity = super::extras::Entity;
-
-    fn link(&self) -> Vec<RelationDef> {
-        vec![
-            extras_dinner::Relation::Dinner.def().rev(),
-            extras_dinner::Relation::Extras.def(),
-        ]
+    fn via() -> Option<RelationDef> {
+        // The original relation is CakeFilling -> Cake,
+        // after `rev` it becomes Cake -> CakeFilling
+        Some(super::extras_dinner::Relation::Dinner.def().rev())
     }
 }
 
