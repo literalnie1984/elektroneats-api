@@ -2,8 +2,9 @@ use std::fmt::format;
 
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
-use entity::{dinner, extras_dinner, extras};
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait};
+use entity::{dinner, extras_dinner, extras, prelude::{Dinner, Extras}};
+use migration::JoinType;
+use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, QuerySelect, RelationTrait};
 
 use crate::{scraper::scrape_menu, errors::ServiceError, appstate::AppState};
 
@@ -35,8 +36,8 @@ async fn get_menu_today(data: web::Data<AppState>) -> Result<String, ServiceErro
     let curr_day = (chrono::offset::Local::now().date_naive().weekday() as usize).min(5);
     let curr_day = int_to_day(curr_day);
 
-    let result = dinner::Entity::find()
-        .find_with_related(extras_dinner::Entity)
+    let result = Dinner::find()
+        .join(JoinType::InnerJoin, extras_dinner::Relation::Extras.def())
         .filter(dinner::Column::WeekDay.eq(curr_day))
         .all(conn)
         .await.unwrap();
