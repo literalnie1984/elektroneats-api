@@ -21,14 +21,11 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(UserDinnerOrders::OrderId)
                             .integer()
-                            .unique_key()
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(UserDinnerOrders::DinnerId)
                             .integer()
-                            .unique_key()
-                            .unsigned()
                             .not_null(),
                     )
                     .foreign_key(
@@ -39,9 +36,45 @@ impl MigrationTrait for Migration {
                             .to_tbl(DinnerOrders::Table)
                             .to_col(DinnerOrders::Id),
                     )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("FK_UDO_U")
+                            .from_tbl(UserDinnerOrders::Table)
+                            .from_col(UserDinnerOrders::DinnerId)
+                            .to_tbl(Dinner::Table)
+                            .to_col(Dinner::Id),
+                    )
                     .to_owned(),
             )
-            .await
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("unique_user_dinner_orders")
+                    .table(UserDinnerOrders::Table)
+                    .col(UserDinnerOrders::OrderId)
+                    .col(UserDinnerOrders::DinnerId)
+                    .unique()
+                    .to_owned()
+            )
+            .await?;
+
+        // manager
+        //     .create_foreign_key(
+        //         sea_query::ForeignKey::create()
+        //                 .name("FK_UDO_DO")
+        //                 .from_tbl(UserDinnerOrders::Table)
+        //                 .from_col(UserDinnerOrders::OrderId)
+        //                 .to_tbl(DinnerOrders::Table)
+        //                 .to_col(DinnerOrders::Id)
+        //                 .on_delete(ForeignKeyAction::Restrict)
+        //                 .on_update(ForeignKeyAction::Restrict)
+        //                 .to_owned()
+        //     )
+        //     .await?;
+
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -61,6 +94,12 @@ enum UserDinnerOrders {
 
 #[derive(Iden)]
 enum DinnerOrders {
+    Table,
+    Id,
+}
+
+#[derive(Iden)]
+enum Dinner {
     Table,
     Id,
 }

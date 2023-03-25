@@ -21,16 +21,27 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(ExtrasOrder::UserDinnerId)
                             .integer()
-                            .unique_key()
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(ExtrasOrder::ExtrasId)
                             .integer()
-                            .unique_key()
                             .not_null(),
                     )
                     .to_owned(),
+            )
+            .await?;
+
+        //add unique key for both UserDinnerId and ExtrasId
+        manager
+            .create_index(
+                Index::create()
+                    .name("unique_extras_order")
+                    .table(ExtrasOrder::Table)
+                    .col(ExtrasOrder::UserDinnerId)
+                    .col(ExtrasOrder::ExtrasId)
+                    .unique()
+                    .to_owned()
             )
             .await?;
 
@@ -55,12 +66,12 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("UNIQ_extras_dinner")
+                    .name("unique_extras_dinner")
                     .table(ExtrasDinner::Table)
                     .col(ExtrasDinner::DinnerId)
                     .col(ExtrasDinner::ExtrasId)
                     .unique()
-                    .to_owned(),
+                    .to_owned()
             )
             .await?;
 
