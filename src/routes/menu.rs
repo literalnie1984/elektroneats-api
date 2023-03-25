@@ -4,6 +4,8 @@ use actix_web::{get, web, Responder};
 use chrono::Datelike;
 use entity::{dinner,extras, prelude::{Dinner, Extras, ExtrasDinner}};
 use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection};
+use serde_json::error;
+use log::error;
 
 use crate::{errors::ServiceError, appstate::AppState};
 
@@ -20,10 +22,20 @@ async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult{
         _ => "saturday",
     };
     let dinners = match day {
-        Some(day) => Dinner::find().filter(dinner::Column::WeekDay.eq(int_to_day(day))).all(conn).await.unwrap(),
-        None => Dinner::find().all(conn).await.unwrap(),
+        Some(day) => Dinner::find().filter(dinner::Column::WeekDay.eq(int_to_day(day))).all(conn).await.map_err(|e| {
+            error!("Database error getting menu: {}", e);
+            ServiceError::InternalError
+        })?,
+        None => Dinner::find().all(conn).await.map_err(|e| {
+            error!("Database error getting menu: {}", e);
+            ServiceError::InternalError
+        })?,
     };
-    let mut extras  = dinners.load_many_to_many(Extras, ExtrasDinner, conn).await.unwrap();
+    
+    let mut extras  = dinners.load_many_to_many(Extras, ExtrasDinner, conn).await.map_err(|e| {
+        error!("Database error getting menu: {}", e);
+        ServiceError::InternalError
+    })?;
 
     let response = dinners.iter().zip(extras.iter_mut())
         .map(|(dinner, extras)| {
