@@ -23,7 +23,7 @@ pub enum Relation {
         on_delete = "Restrict"
     )]
     User,
-    #[sea_orm(has_one = "super::user_dinner_orders::Entity")]
+    #[sea_orm(has_many = "super::user_dinner_orders::Entity")]
     UserDinnerOrders,
 }
 

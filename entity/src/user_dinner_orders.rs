@@ -7,14 +7,20 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    #[sea_orm(unique)]
     pub order_id: i32,
-    #[sea_orm(unique)]
-    pub dinner_id: u32,
+    pub dinner_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::dinner::Entity",
+        from = "Column::DinnerId",
+        to = "super::dinner::Column::Id",
+        on_update = "Restrict",
+        on_delete = "Restrict"
+    )]
+    Dinner,
     #[sea_orm(
         belongs_to = "super::dinner_orders::Entity",
         from = "Column::OrderId",
@@ -25,6 +31,12 @@ pub enum Relation {
     DinnerOrders,
     #[sea_orm(has_many = "super::extras_order::Entity")]
     ExtrasOrder,
+}
+
+impl Related<super::dinner::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Dinner.def()
+    }
 }
 
 impl Related<super::dinner_orders::Entity> for Entity {
