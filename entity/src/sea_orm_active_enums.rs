@@ -10,19 +10,3 @@ pub enum Type {
     #[sea_orm(string_value = "main")]
     Main,
 }
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "week_day")]
-pub enum WeekDay {
-    #[sea_orm(string_value = "monday")]
-    Monday,
-    #[sea_orm(string_value = "tuesday")]
-    Tuesday,
-    #[sea_orm(string_value = "wednesday")]
-    Wednesday,
-    #[sea_orm(string_value = "thursday")]
-    Thursday,
-    #[sea_orm(string_value = "friday")]
-    Friday,
-    #[sea_orm(string_value = "saturday")]
-    Saturday,
-}

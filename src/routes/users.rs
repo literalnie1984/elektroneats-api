@@ -94,7 +94,7 @@ async fn login(
 }
 
 #[post("/register")]
-async fn register(user: web::Json<user::Model>, data: web::Data<AppState>) -> impl Responder {
+async fn register(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
 
     let user = user.into_inner();

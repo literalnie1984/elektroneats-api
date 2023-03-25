@@ -11,25 +11,14 @@ const TWO_PARTS_DISHES_PREFIXES: [&'static str; 2] = ["po ", "i "];
 pub struct MenuDay {
     soup: String,
     dishes: Vec<String>,
-    extras: Vec<String>,
+    extras: String,
 }
 impl MenuDay {
     fn empty() -> Self {
         Self {
             soup: String::new(),
             dishes: Vec::with_capacity(3),
-            extras: Vec::with_capacity(3),
-        }
-    }
-
-    fn same_extras() -> Self {
-        Self {
-            soup: String::new(),
-            dishes: Vec::with_capacity(3),
-            extras: ["ziemniaki", "surówka", "kompot"]
-                .iter()
-                .map(|val| String::from(*val))
-                .collect(),
+            extras: String::new(),
         }
     }
 }
@@ -40,6 +29,11 @@ fn get_menu() -> Result<String, ureq::Error> {
     Ok(html)
 }
 
+//vec looks like
+//idx 0: [day1, day2, day3] - soups
+//idx 1: [...] - blank
+//idx 2..?: [...] - dishes
+//idx -1..-3: [...] - extras
 fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
     let mut menu_days: Vec<MenuDay> = vec![MenuDay::empty(); 3];
 
@@ -53,6 +47,10 @@ fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
     for dishes in vec.iter().skip(2).take_while(|dishes| !dishes.is_empty()) {
         for idx in 0..3 {
             let curr_dish = &dishes[idx];
+            //not all of the dishes have 3 rows
+            if curr_dish.is_empty() {
+                continue;
+            }
             if TWO_PARTS_DISHES_PREFIXES
                 .iter()
                 .map(|prefix| curr_dish.starts_with(prefix))
@@ -69,9 +67,12 @@ fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
     }
 
     //extras
-    for extras in vec.iter().rev().take(3) {
+    for extras in vec.iter().rev().take(3).skip(2)
+    //Every dish has kompot and surówka as extras so
+    //might just skip 'em
+    {
         for idx in 0..3 {
-            menu_days[idx].extras.push(extras[idx].clone());
+            menu_days[idx].extras = extras[idx].clone();
         }
     }
 
@@ -117,19 +118,14 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
             vec.clear();
         }
 
-        if !is_wed {
-            if let Some(txt) = vec.iter().nth(0) {
-                if txt == "kompot" {
-                    is_wed = true;
-                    mon_to_wed.push(vec);
-                    continue;
-                }
-            }
-        }
-
         if is_wed {
             thu_to_sat.push(vec);
         } else {
+            if let Some(txt) = vec.iter().nth(0) {
+                if txt == "kompot" {
+                    is_wed = true;
+                }
+            }
             mon_to_wed.push(vec);
         }
     }

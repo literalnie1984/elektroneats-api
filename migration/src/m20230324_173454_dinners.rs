@@ -24,11 +24,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Dinner::Name).string().not_null())
                     .col(ColumnDef::new(Dinner::Price).decimal_len(6, 2).not_null())
                     .col(ColumnDef::new(Dinner::Image).string().not_null())
-                    .col(
-                        ColumnDef::new(Dinner::WeekDay)
-                            .enumeration(Dinner::WeekDay, WeekDay::iter().skip(1))
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Dinner::WeekDay).tiny_unsigned().not_null())
                     .col(ColumnDef::new(Dinner::MaxSupply).integer().not_null())
                     .to_owned(),
             )
@@ -87,7 +83,7 @@ enum Extras {
     Price,
 }
 
-#[derive(Iden, EnumIter)]
+/* #[derive(Iden, EnumIter)]
 pub enum WeekDay {
     Table,
     Monday,
@@ -96,4 +92,4 @@ pub enum WeekDay {
     Thursday,
     Friday,
     Saturday,
-}
+} */
