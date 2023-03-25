@@ -42,14 +42,11 @@ impl Related<super::user_dinner_orders::Entity> for Entity {
 }
 
 impl Related<super::extras::Entity> for Entity {
-    // The final relation is Cake -> CakeFilling -> Filling
     fn to() -> RelationDef {
         super::extras_dinner::Relation::Extras.def()
     }
 
     fn via() -> Option<RelationDef> {
-        // The original relation is CakeFilling -> Cake,
-        // after `rev` it becomes Cake -> CakeFilling
         Some(super::extras_dinner::Relation::Dinner.def().rev())
     }
 }
