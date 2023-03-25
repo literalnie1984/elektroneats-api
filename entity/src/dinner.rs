@@ -41,14 +41,4 @@ impl Related<super::user_dinner_orders::Entity> for Entity {
     }
 }
 
-impl Related<super::extras::Entity> for Entity {
-    fn to() -> RelationDef {
-        super::extras_dinner::Relation::Extras.def()
-    }
-
-    fn via() -> Option<RelationDef> {
-        Some(super::extras_dinner::Relation::Dinner.def().rev())
-    }
-}
-
 impl ActiveModelBehavior for ActiveModel {}
