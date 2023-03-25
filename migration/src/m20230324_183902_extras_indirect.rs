@@ -46,18 +46,20 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(ExtrasDinner::DinnerId)
-                            .integer()
-                            .unique_key()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(ExtrasDinner::ExtrasId)
-                            .integer()
-                            .unique_key()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(ExtrasDinner::DinnerId).integer().not_null())
+                    .col(ColumnDef::new(ExtrasDinner::ExtrasId).integer().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("UNIQ_extras_dinner")
+                    .table(ExtrasDinner::Table)
+                    .col(ExtrasDinner::DinnerId)
+                    .col(ExtrasDinner::ExtrasId)
+                    .unique()
                     .to_owned(),
             )
             .await?;

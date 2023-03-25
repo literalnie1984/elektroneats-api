@@ -43,7 +43,7 @@ impl MigrationTrait for Migration {
                             .auto_increment(),
                     )
                     .col(ColumnDef::new(Extras::Name).string().not_null())
-                    .col(ColumnDef::new(Extras::Price).decimal_len(6, 2))
+                    .col(ColumnDef::new(Extras::Price).decimal_len(6, 2).not_null())
                     .to_owned(),
             )
             .await?;

@@ -1,7 +1,7 @@
 use std::{mem::take, vec};
 
 use actix_web::web;
-use entity::dinner;
+use entity::{dinner, extras, extras_dinner};
 use log::error;
 use scraper::{Html, Selector};
 use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
@@ -16,14 +16,14 @@ const TWO_PARTS_DISHES_PREFIXES: [&'static str; 3] = ["po ", "i ", "opiekane "];
 pub struct MenuDay {
     soup: String,
     dishes: Vec<String>,
-    extras: String,
+    extras: Option<String>,
 }
 impl MenuDay {
     fn empty() -> Self {
         Self {
             soup: String::new(),
             dishes: Vec::with_capacity(3),
-            extras: String::new(),
+            extras: None,
         }
     }
 }
@@ -81,7 +81,13 @@ fn vec_to_menu(mut vec: Vec<Vec<String>>) -> Vec<MenuDay> {
     //might as well just skip 'em
     {
         for idx in 0..3 {
-            menu_days[idx].extras = take(&mut extras[idx]);
+            //extras usually is ziemniaki but can be ziemniaki / X, if so save X
+            let mut extra = extras[idx].splitn(2, "/");
+            if let Some(extra) = extra.nth(1) {
+                menu_days[idx].extras = Some(trim_whitespace(extra));
+            } else {
+                menu_days[idx].extras = None;
+            }
         }
     }
 
@@ -155,6 +161,35 @@ pub async fn save_menu(
     conn: &DatabaseConnection,
     mut menu: Vec<MenuDay>,
 ) -> Result<(), ServiceError> {
+    let convert_db_err = |err| {
+        error!("Detabase err, {}", err);
+        ServiceError::InternalError
+    };
+    let static_extras = vec![
+        extras::ActiveModel {
+            name: Set("Ziemniaki".into()),
+            price: Set(Decimal::new(10, 1)),
+            ..Default::default()
+        },
+        extras::ActiveModel {
+            name: Set("Surówka".into()),
+            price: Set(Decimal::new(10, 1)),
+            ..Default::default()
+        },
+        extras::ActiveModel {
+            name: Set("Kompot".into()),
+            price: Set(Decimal::new(05, 1)),
+            ..Default::default()
+        },
+    ];
+    extras::Entity::insert_many(static_extras)
+        .exec(conn)
+        .await
+        .map_err(convert_db_err)?;
+
+    let mut prev_last_insert_id = 1;
+    let mut extras_dinners_all: Vec<extras_dinner::ActiveModel> =
+        Vec::with_capacity((3.5 * menu.len() as f32).round() as usize);
     for (day, menu) in menu.iter_mut().enumerate() {
         let soup = dinner::ActiveModel {
             name: Set(take(&mut menu.soup)),
@@ -165,6 +200,7 @@ pub async fn save_menu(
             image: Set("TODO".into()),
             ..Default::default()
         };
+
         let mut dinners: Vec<_> = menu
             .dishes
             .iter_mut()
@@ -183,11 +219,30 @@ pub async fn save_menu(
         let res = dinner::Entity::insert_many(dinners)
             .exec(conn)
             .await
-            .map_err(|err| {
-                error!("Database error: {}", err);
-                ServiceError::InternalError
-            })?;
+            .map_err(convert_db_err)?;
+
+        //-1 bcs soup shouldn't have any extras
+        let curr_last = res.last_insert_id - 1;
+
+        for dinner_idx in prev_last_insert_id..=curr_last {
+            let mut single: Vec<_> = (1..=3)
+                .map(|idx| extras_dinner::ActiveModel {
+                    dinner_id: Set(dinner_idx - 1),
+                    extras_id: Set(idx),
+                    ..Default::default()
+                })
+                .collect();
+            extras_dinners_all.append(&mut single);
+        }
+
+        //+2 bcs soup + need to go to 1 after last idx
+        prev_last_insert_id = curr_last + 2;
     }
+
+    extras_dinner::Entity::insert_many(extras_dinners_all)
+        .exec(conn)
+        .await
+        .map_err(convert_db_err)?;
 
     Ok(())
 }
