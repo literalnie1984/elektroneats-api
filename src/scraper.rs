@@ -162,7 +162,7 @@ pub async fn save_menu(
     mut menu: Vec<MenuDay>,
 ) -> Result<(), ServiceError> {
     let convert_db_err = |err| {
-        error!("Detabase err, {}", err);
+        error!("Database err, {}", err);
         ServiceError::InternalError
     };
     let static_extras = vec![
@@ -190,6 +190,7 @@ pub async fn save_menu(
     let mut prev_last_insert_id = 1;
     let mut extras_dinners_all: Vec<extras_dinner::ActiveModel> =
         Vec::with_capacity((3.5 * menu.len() as f32).round() as usize);
+
     for (day, menu) in menu.iter_mut().enumerate() {
         let soup = dinner::ActiveModel {
             name: Set(take(&mut menu.soup)),
@@ -221,21 +222,45 @@ pub async fn save_menu(
             .await
             .map_err(convert_db_err)?;
 
-        //-1 bcs soup shouldn't have any extras
-        let curr_last = res.last_insert_id - 1;
+        //+2 bcs last_insert_id is weird, IDK don't ask me
+        let curr_last = res.last_insert_id + 2;
+
+        let additional = {
+            if let Some(other_extra) = menu.extras.clone() {
+                let res = extras::Entity::insert(extras::ActiveModel {
+                    name: Set(other_extra),
+                    price: Set(Decimal::new(10, 1)),
+                    ..Default::default()
+                })
+                .exec(conn)
+                .await
+                .map_err(convert_db_err)?;
+                Some(res.last_insert_id)
+            } else {
+                None
+            }
+        };
+        dbg!(&additional);
 
         for dinner_idx in prev_last_insert_id..=curr_last {
+            eprint!("{dinner_idx} ");
             let mut single: Vec<_> = (1..=3)
                 .map(|idx| extras_dinner::ActiveModel {
-                    dinner_id: Set(dinner_idx - 1),
+                    dinner_id: Set(dinner_idx),
                     extras_id: Set(idx),
                     ..Default::default()
                 })
                 .collect();
+            if let Some(additional) = additional {
+                single.push(extras_dinner::ActiveModel {
+                    dinner_id: Set(dinner_idx),
+                    extras_id: Set(additional),
+                    ..Default::default()
+                });
+            }
             extras_dinners_all.append(&mut single);
         }
 
-        //+2 bcs soup + need to go to 1 after last idx
         prev_last_insert_id = curr_last + 2;
     }
 

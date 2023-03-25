@@ -12,8 +12,8 @@ use kantyna_api::appstate::AppState;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "info");
-    std::env::set_var("RUST_BACKTRACE", "1");
+    /* std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_BACKTRACE", "1"); */
     env_logger::init();
 
     dotenvy::dotenv().expect(".env file not found");
