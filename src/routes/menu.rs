@@ -35,6 +35,6 @@ async fn get_menu_item(item_id: web::Path<u32>) -> impl Responder {
 #[get("/save")]
 async fn save(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let menu = scrape_menu().await?;
-    save_menu(&data.conn, &menu).await?;
+    save_menu(&data.conn, menu).await?;
     Ok("saved to db")
 }

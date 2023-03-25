@@ -1,4 +1,4 @@
-use std::vec;
+use std::{mem::take, vec};
 
 use actix_web::web;
 use entity::dinner;
@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::errors::ServiceError;
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
-const TWO_PARTS_DISHES_PREFIXES: [&'static str; 2] = ["po ", "i "];
+const TWO_PARTS_DISHES_PREFIXES: [&'static str; 3] = ["po ", "i ", "opiekane "];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MenuDay {
@@ -39,19 +39,23 @@ fn get_menu() -> Result<String, ureq::Error> {
 //idx 1: [...] - blank
 //idx 2..?: [...] - dishes
 //idx -1..-3: [...] - extras
-fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
+fn vec_to_menu(mut vec: Vec<Vec<String>>) -> Vec<MenuDay> {
     let mut menu_days: Vec<MenuDay> = vec![MenuDay::empty(); 3];
 
     //soup
-    let soups = &vec[0];
+    let soups = &mut vec[0];
     for idx in 0..3 {
-        menu_days[idx].soup = soups[idx].clone();
+        menu_days[idx].soup = take(&mut soups[idx]);
     }
 
     //dishes
-    for dishes in vec.iter().skip(2).take_while(|dishes| !dishes.is_empty()) {
+    for dishes in vec
+        .iter_mut()
+        .skip(2)
+        .take_while(|dishes| !dishes.is_empty())
+    {
         for idx in 0..3 {
-            let curr_dish = &dishes[idx];
+            let curr_dish = &mut dishes[idx];
             //not all of the dishes have 3 rows
             if curr_dish.is_empty() {
                 continue;
@@ -66,18 +70,18 @@ fn vec_to_menu(vec: &Vec<Vec<String>>) -> Vec<MenuDay> {
                     last_dish.push_str(curr_dish);
                 }
             } else {
-                menu_days[idx].dishes.push(curr_dish.clone());
+                menu_days[idx].dishes.push(take(curr_dish));
             }
         }
     }
 
     //extras
-    for extras in vec.iter().rev().take(3).skip(2)
+    for extras in vec.iter_mut().rev().take(3).skip(2)
     //Every dish has kompot and surówka as extras so
-    //might just skip 'em
+    //might as well just skip 'em
     {
         for idx in 0..3 {
-            menu_days[idx].extras = extras[idx].clone();
+            menu_days[idx].extras = take(&mut extras[idx]);
         }
     }
 
@@ -141,16 +145,19 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     }
 
     let mut weekly_menu: Vec<MenuDay> = Vec::with_capacity(6);
-    weekly_menu.append(&mut vec_to_menu(&mon_to_wed));
-    weekly_menu.append(&mut vec_to_menu(&thu_to_sat));
+    weekly_menu.append(&mut vec_to_menu(mon_to_wed));
+    weekly_menu.append(&mut vec_to_menu(thu_to_sat));
 
     Ok(weekly_menu)
 }
 
-pub async fn save_menu(conn: &DatabaseConnection, menu: &Vec<MenuDay>) -> Result<(), ServiceError> {
-    for (day, menu) in menu.iter().enumerate() {
+pub async fn save_menu(
+    conn: &DatabaseConnection,
+    mut menu: Vec<MenuDay>,
+) -> Result<(), ServiceError> {
+    for (day, menu) in menu.iter_mut().enumerate() {
         let soup = dinner::ActiveModel {
-            name: Set(menu.soup.clone()),
+            name: Set(take(&mut menu.soup)),
             r#type: Set(entity::sea_orm_active_enums::Type::Soup),
             week_day: Set(day as u8),
             max_supply: Set(15),
@@ -160,9 +167,9 @@ pub async fn save_menu(conn: &DatabaseConnection, menu: &Vec<MenuDay>) -> Result
         };
         let mut dinners: Vec<_> = menu
             .dishes
-            .iter()
-            .map(|dish| dinner::ActiveModel {
-                name: Set(dish.to_owned()),
+            .iter_mut()
+            .map(|mut dish| dinner::ActiveModel {
+                name: Set(take(&mut dish)),
                 r#type: Set(entity::sea_orm_active_enums::Type::Main),
                 week_day: Set(day as u8),
                 max_supply: Set(15),
