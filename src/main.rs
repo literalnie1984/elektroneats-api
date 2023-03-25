@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix_web::middleware::Logger;
-use actix_web::{services, web, App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
