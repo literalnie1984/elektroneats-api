@@ -33,24 +33,10 @@ async fn change_password(
     let user_query = User::find()
         .filter(user::Column::Id.eq(user.id))
         .one(conn)
-        .await;
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
-    let user_query = match user_query {
-        Ok(l) => l,
-        Err(error) => {
-            error!("Database error: {}", error);
-            return Err(ServiceError::InternalError);
-        }
-    };
-
-    let user = match user_query {
-        Some(l) => l,
-        None => {
-            return Err(ServiceError::BadRequest(
-                "Account does not exist".to_string(),
-            ))
-        }
-    };
+    let Some(user) = user_query else {return Err(ServiceError::BadRequest( "Account does not exist".to_string(),))};
 
     if !verify(&pass_data.old_password, &user.password).unwrap() {
         return Err(ServiceError::BadRequest(
@@ -80,14 +66,8 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
     let user_query = User::find()
         .filter(user::Column::Id.eq(user.id))
         .one(conn)
-        .await;
-
-    if let Err(error) = user_query {
-        error!("Database error: {}", error);
-        return Err(ServiceError::InternalError);
-    }
-
-    let user_query = user_query.unwrap();
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
     let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
@@ -132,6 +112,7 @@ async fn delete_acc(
         .delete(conn)
         .await
         .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+
     if res.rows_affected == 1 {
         Ok("Deleted account successfully")
     } else {
@@ -149,25 +130,14 @@ async fn login(
     let user_query = User::find()
         .filter(user::Column::Email.eq(user.email))
         .one(conn)
-        .await;
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
-    if let Err(error) = user_query {
-        error!("Database error: {}", error);
-        return Err(ServiceError::InternalError);
-    }
-
-    let user_query = user_query.unwrap();
-
-    if user_query.is_none() {
-        return Err(ServiceError::BadRequest(
-            "Account does not exist".to_string(),
-        ));
-    }
-    let user_query = user_query.unwrap();
-    let result = verify(&user.password, &user_query.password).unwrap();
+    let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+    let result = verify(&user.password, &user.password).unwrap();
 
     if result {
-        let token = match create_jwt(user_query.id) {
+        let token = match create_jwt(user.id) {
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);
@@ -192,14 +162,9 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
     let user_query = User::find()
         .filter(user::Column::Email.eq(&user.email))
         .one(conn)
-        .await;
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
-    if let Err(error) = user_query {
-        error!("Database error: {}", error);
-        return Err(ServiceError::InternalError);
-    }
-
-    let user_query = user_query.unwrap();
     if user_query.is_some() {
         return Err(ServiceError::BadRequest(
             "Account already exists".to_string(),
@@ -210,19 +175,15 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
     let salt_copy: [u8; 16] = salt.as_bytes().try_into().unwrap();
     let hashed_pass = hash_with_salt(user.password.as_bytes(), DEFAULT_COST, salt_copy).unwrap();
 
-    let result = user::ActiveModel {
+    user::ActiveModel {
         username: Set(user.username),
         email: Set(user.email.clone()),
         password: Set(hashed_pass.to_string()),
         ..Default::default()
     }
     .save(conn)
-    .await;
-
-    if let Err(error) = result {
-        error!("Database error: {}", error);
-        return Err(ServiceError::InternalError);
-    }
+    .await
+    .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
     send_verification_mail(
         &user.email,

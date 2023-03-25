@@ -7,7 +7,7 @@ use scraper::{Html, Selector};
 use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
 
-use crate::errors::ServiceError;
+use crate::{convert_err_to_500, errors::ServiceError};
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
 const TWO_PARTS_DISHES_PREFIXES: [&'static str; 3] = ["po ", "i ", "opiekane "];
@@ -109,10 +109,7 @@ fn trim_whitespace(s: &str) -> String {
 pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     let site_data = web::block(|| get_menu().expect("Couldn't get site data"))
         .await
-        .map_err(|err| {
-            error!("site get err: {}", err);
-            ServiceError::InternalError
-        })?;
+        .map_err(|err| convert_err_to_500(err, Some("Fetch site err")))?;
 
     let document = Html::parse_document(&site_data);
     let tr_selector = Selector::parse(".xl7624020").unwrap();
