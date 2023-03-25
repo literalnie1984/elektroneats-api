@@ -12,6 +12,8 @@ use entity::prelude::User;
 use entity::user;
 
 use crate::appstate::{ActivatorsVec, AppState};
+use crate::convert_err_to_500;
+use crate::enums::VerificationType;
 
 use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
@@ -183,76 +185,56 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
         return Err(ServiceError::InternalError);
     }
 
-    send_verification_mail(&user.email, &data.activators).await
+    send_verification_mail(
+        &user.email,
+        &data.activators_reg,
+        VerificationType::Register,
+    )
+    .await
 }
 
-//definitely refactor this
 #[get("/activate/{token}")]
 async fn activate_account(
     token: Path<String>,
     data: web::Data<AppState>,
 ) -> Result<String, ServiceError> {
-    let tokens = data.activators.read().await;
-    if let Some(email) = tokens.get(&token.into_inner()) {
-        let conn = &data.conn;
-        let user_query = User::find()
-            .filter(user::Column::Email.eq(email))
-            .one(conn)
-            .await;
+    let tokens = data.activators_reg.read().await;
+    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::InternalError)};
+    let conn = &data.conn;
+    let user_query = User::find()
+        .filter(user::Column::Email.eq(email))
+        .one(conn)
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
-        if let Err(error) = user_query {
-            error!("Database error: {}", error);
-            return Err(ServiceError::InternalError);
-        }
+    let Some(user) = user_query else {return Err(ServiceError::InternalError)};
+    let mut user: user::ActiveModel = user.into();
+    user.verified = Set(true as i8);
 
-        if let Some(user) = user_query.unwrap() {
-            let mut user: user::ActiveModel = user.into();
-            user.verified = Set(true as i8);
+    user.update(conn)
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
-            if let Err(err) = user.update(conn).await {
-                error!("Database error: {}", err);
-                return Err(ServiceError::InternalError);
-            }
-
-            Ok("account verified successfully".to_string())
-        } else {
-            return Err(ServiceError::InternalError);
-        }
-    } else {
-        return Err(ServiceError::InternalError);
-    }
+    Ok("account verified successfully".to_string())
 }
 
-//TODO: actually make this function async
 async fn send_verification_mail(
     email: &str,
     activators: &ActivatorsVec,
+    email_type: VerificationType,
 ) -> Result<String, ServiceError> {
-    let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse();
-    let to = email.parse();
-
-    if from.is_err() || to.is_err() {
-        return Err(ServiceError::InternalError);
-    }
+    let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse().unwrap();
+    let to = email
+        .parse()
+        .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
 
     //add email - activation_link combo to current app state
-    let mut activators = activators.write().await;
     let activation_link = nanoid!();
-    (*activators).insert(activation_link.clone(), email.into());
-
-    let mail = Message::builder()
-        .from(from.unwrap())
-        .to(to.unwrap())
-        .subject("Twój kod do kantyny")
-        .body(format!(
-            "http://127.0.0.1:4765/api/user/activate/{}",
-            activation_link
-        ));
-
-    if mail.is_err() {
-        return Err(ServiceError::InternalError);
-    }
-    let mail = mail.unwrap();
+    let mail = email_type
+        .email_msg(to, from, &activation_link)
+        .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
+    let mut activators = activators.write().await;
+    (*activators).insert(activation_link, email.into());
 
     let smtp: AsyncSmtpTransport<AsyncStd1Executor> =
         AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay("mikut.dev")
@@ -260,7 +242,7 @@ async fn send_verification_mail(
             .credentials(Credentials::new(
                 "kantyna.noreply@mikut.dev".to_owned(),
                 dotenvy::var("EMAIL_PASS")
-                    .expect("NO EMAIL_PASS val provided in .evn")
+                    .expect("NO EMAIL_PASS val provided in .env")
                     .to_string(),
             ))
             .authentication(vec![Mechanism::Plain])
@@ -269,6 +251,6 @@ async fn send_verification_mail(
 
     match smtp.send(mail).await {
         Err(_) => Err(ServiceError::InternalError),
-        Ok(_) => Ok("Registered successfully; email send".to_string()),
+        Ok(_) => Ok("email send".to_string()),
     }
 }

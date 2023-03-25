@@ -157,7 +157,7 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     Ok(weekly_menu)
 }
 
-pub async fn save_menu(
+pub async fn update_menu(
     conn: &DatabaseConnection,
     mut menu: Vec<MenuDay>,
 ) -> Result<(), ServiceError> {

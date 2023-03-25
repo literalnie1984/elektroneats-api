@@ -7,5 +7,6 @@ pub type ActivatorsVec = Arc<RwLock<HashMap<String, String>>>;
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub conn: DatabaseConnection,
-    pub activators: ActivatorsVec,
+    pub activators_del: ActivatorsVec,
+    pub activators_reg: ActivatorsVec,
 }

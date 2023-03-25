@@ -12,8 +12,8 @@ use kantyna_api::appstate::AppState;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    /* std::env::set_var("RUST_LOG", "info");
-    std::env::set_var("RUST_BACKTRACE", "1"); */
+    std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_BACKTRACE", "1");
     env_logger::init();
 
     dotenvy::dotenv().expect(".env file not found");
@@ -25,7 +25,8 @@ async fn main() -> std::io::Result<()> {
     //create outside of closure so workers can share state
     let state = web::Data::new(AppState {
         conn: connection,
-        activators: Arc::new(RwLock::new(HashMap::new())),
+        activators_reg: Arc::new(RwLock::new(HashMap::new())),
+        activators_del: Arc::new(RwLock::new(HashMap::new())),
     });
 
     HttpServer::new(move || {
@@ -47,7 +48,7 @@ async fn main() -> std::io::Result<()> {
                         .service(get_menu_item)
                         .service(get_menu_today)
                         .service(get_menu_day)
-                        .service(save),
+                        .service(update),
                 ),
         )
     })
