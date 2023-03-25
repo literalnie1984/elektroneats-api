@@ -1,7 +1,11 @@
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
 
-use crate::scraper::scrape_menu;
+use crate::{
+    appstate::AppState,
+    errors::ServiceError,
+    scraper::{save_menu, scrape_menu},
+};
 
 #[get("/")]
 async fn get_menu() -> actix_web::Result<impl Responder> {
@@ -26,4 +30,11 @@ async fn get_menu_day(day: web::Path<u8>) -> actix_web::Result<impl Responder> {
 #[get("/{item_id}/")]
 async fn get_menu_item(item_id: web::Path<u32>) -> impl Responder {
     "TODO - display details about specific item from menu"
+}
+
+#[get("/save")]
+async fn save(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
+    let menu = scrape_menu().await?;
+    save_menu(&data.conn, &menu).await?;
+    Ok("saved to db")
 }

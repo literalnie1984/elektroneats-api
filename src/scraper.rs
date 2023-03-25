@@ -1,8 +1,13 @@
 use std::vec;
 
 use actix_web::web;
+use entity::dinner;
+use log::error;
 use scraper::{Html, Selector};
+use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
+
+use crate::errors::ServiceError;
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
 const TWO_PARTS_DISHES_PREFIXES: [&'static str; 2] = ["po ", "i "];
@@ -91,8 +96,13 @@ fn trim_whitespace(s: &str) -> String {
     owned
 }
 
-pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
-    let site_data = web::block(|| get_menu().expect("Couldn't get site data")).await?;
+pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
+    let site_data = web::block(|| get_menu().expect("Couldn't get site data"))
+        .await
+        .map_err(|err| {
+            error!("site get err: {}", err);
+            ServiceError::InternalError
+        })?;
 
     let document = Html::parse_document(&site_data);
     let tr_selector = Selector::parse(".xl7624020").unwrap();
@@ -135,4 +145,42 @@ pub async fn scrape_menu() -> actix_web::Result<Vec<MenuDay>> {
     weekly_menu.append(&mut vec_to_menu(&thu_to_sat));
 
     Ok(weekly_menu)
+}
+
+pub async fn save_menu(conn: &DatabaseConnection, menu: &Vec<MenuDay>) -> Result<(), ServiceError> {
+    for (day, menu) in menu.iter().enumerate() {
+        let soup = dinner::ActiveModel {
+            name: Set(menu.soup.clone()),
+            r#type: Set(entity::sea_orm_active_enums::Type::Soup),
+            week_day: Set(day as u8),
+            max_supply: Set(15),
+            price: Set(Decimal::new(15, 1)),
+            image: Set("TODO".into()),
+            ..Default::default()
+        };
+        let mut dinners: Vec<_> = menu
+            .dishes
+            .iter()
+            .map(|dish| dinner::ActiveModel {
+                name: Set(dish.to_owned()),
+                r#type: Set(entity::sea_orm_active_enums::Type::Main),
+                week_day: Set(day as u8),
+                max_supply: Set(15),
+                price: Set(Decimal::new(15, 0)),
+                image: Set("TODO".into()),
+                ..Default::default()
+            })
+            .collect();
+        dinners.push(soup);
+
+        let res = dinner::Entity::insert_many(dinners)
+            .exec(conn)
+            .await
+            .map_err(|err| {
+                error!("Database error: {}", err);
+                ServiceError::InternalError
+            })?;
+    }
+
+    Ok(())
 }

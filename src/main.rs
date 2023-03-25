@@ -1,5 +1,4 @@
 use async_std::sync::RwLock;
-use lettre::transport::smtp::extension::ServerInfo;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -31,11 +30,8 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let logger = Logger::default();
-    
-        App::new()
-        .wrap(logger)
-        .app_data(state.clone())
-        .service(
+
+        App::new().wrap(logger).app_data(state.clone()).service(
             web::scope("/api")
                 .service(
                     web::scope("/user")
@@ -50,7 +46,8 @@ async fn main() -> std::io::Result<()> {
                         .service(get_menu)
                         .service(get_menu_item)
                         .service(get_menu_today)
-                        .service(get_menu_day),
+                        .service(get_menu_day)
+                        .service(save),
                 ),
         )
     })
