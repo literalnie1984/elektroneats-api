@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix_web::middleware::Logger;
-use actix_web::{web, App, HttpServer};
+use actix_web::{services, web, App, HttpServer};
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
@@ -40,7 +40,9 @@ async fn main() -> std::io::Result<()> {
                         .service(register)
                         .service(activate_account)
                         .service(get_user_data)
-                        .service(change_password),
+                        .service(change_password)
+                        .service(get_delete_mail)
+                        .service(delete_acc),
                 )
                 .service(
                     web::scope("/menu")

@@ -3,7 +3,7 @@ use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
 use nanoid::nanoid;
@@ -89,15 +89,54 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
 
     let user_query = user_query.unwrap();
 
-    if user_query.is_none() {
-        return Err(ServiceError::BadRequest(
-            "Account does not exist".to_string(),
-        ));
-    }
-
-    let user = user_query.unwrap();
+    let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
     Ok(format!("User data: {}", user.username))
+}
+
+#[get("/delete")]
+async fn get_delete_mail(
+    user: AuthUser,
+    data: web::Data<AppState>,
+) -> Result<impl Responder, ServiceError> {
+    let conn = &data.conn;
+
+    let user_query = User::find()
+        .filter(user::Column::Id.eq(user.id))
+        .one(conn)
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+
+    let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+
+    send_verification_mail(&user.email, &data.activators_del, VerificationType::Delete).await
+}
+
+#[get("/delete/{token}")]
+async fn delete_acc(
+    data: web::Data<AppState>,
+    token: Path<String>,
+) -> Result<impl Responder, ServiceError> {
+    let tokens = data.activators_del.read().await;
+    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
+    let conn = &data.conn;
+    let user_query: Option<user::Model> = User::find()
+        .filter(user::Column::Email.eq(email))
+        .one(conn)
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+
+    let Some(user) = user_query else {return Err(ServiceError::InternalError)};
+
+    let res = user
+        .delete(conn)
+        .await
+        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+    if res.rows_affected == 1 {
+        Ok("Deleted account successfully")
+    } else {
+        Err(ServiceError::InternalError)
+    }
 }
 
 #[post("/login")]
