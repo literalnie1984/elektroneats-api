@@ -1,8 +1,9 @@
-use std::{fmt::format};
+use std::{fmt::format, mem};
 
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
 use entity::{dinner, extras_dinner, extras, prelude::{Dinner, Extras, ExtrasDinner}};
+use log::info;
 use migration::JoinType;
 use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, QuerySelect, RelationTrait, LoaderTrait};
 
@@ -22,7 +23,7 @@ async fn get_menu() -> actix_web::Result<impl Responder> {
 // }
 
 #[get("/today")]
-async fn get_menu_today(data: web::Data<AppState>) -> Result<String, ServiceError> {
+async fn get_menu_today(data: web::Data<AppState>) -> Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError> {
     let conn = &data.conn;
     let int_to_day = |day: usize| match day {
         0 => "monday",
@@ -37,14 +38,14 @@ async fn get_menu_today(data: web::Data<AppState>) -> Result<String, ServiceErro
     let curr_day = int_to_day(curr_day);
 
     let dinners = Dinner::find().filter(dinner::Column::WeekDay.eq(curr_day)).all(conn).await.unwrap();
-    let extras  = dinners.load_many_to_many(Extras, ExtrasDinner, conn).await.unwrap();
+    let mut extras  = dinners.load_many_to_many(Extras, ExtrasDinner, conn).await.unwrap();
 
-    let response = dinners.iter().zip(extras.iter())
+    let response = dinners.iter().zip(extras.iter_mut())
         .map(|(dinner, extras)| {
-            (dinner, extras)
+            (dinner.clone(), mem::take(extras))
         }).collect::<Vec<_>>();
 
-    Ok(format!("{:#?}", response))
+    Ok(web::Json(response))
 }
 
 #[get("/day/{day:[0-9]}")]
