@@ -37,7 +37,7 @@ async fn get_menu_today(data: web::Data<AppState>) -> Result<String, ServiceErro
     let curr_day = int_to_day(curr_day);
 
     let result = Dinner::find()
-        .join(JoinType::InnerJoin, extras_dinner::Relation::Extras.def())
+        .find_also_linked(dinner::DinnerToExtras)
         .filter(dinner::Column::WeekDay.eq(curr_day))
         .all(conn)
         .await.unwrap();
