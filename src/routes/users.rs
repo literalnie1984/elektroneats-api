@@ -134,11 +134,11 @@ async fn login(
         .await
         .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
-    let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
-    let result = verify(&user.password, &user.password).unwrap();
+    let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+    let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        let token = match create_jwt(user.id) {
+        let token = match create_jwt(user_query.id) {
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);
