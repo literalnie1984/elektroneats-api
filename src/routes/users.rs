@@ -2,7 +2,7 @@ use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
-use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message};
+use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
