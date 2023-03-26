@@ -3,20 +3,22 @@ use async_std::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
-use actix_cors::Cors;
 
 use kantyna_api::appstate::AppState;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "info");
-    std::env::set_var("RUST_BACKTRACE", "1");
-    env_logger::init();
+    if cfg!(debug_assertions) {
+        std::env::set_var("RUST_LOG", "info");
+        std::env::set_var("RUST_BACKTRACE", "1");
+        env_logger::init();
+    }
 
     dotenvy::dotenv().expect(".env file not found");
     let db_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
@@ -38,31 +40,30 @@ async fn main() -> std::io::Result<()> {
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE]);
 
+        let routes = web::scope("/api")
+            .service(
+                web::scope("/user")
+                    .service(login)
+                    .service(register)
+                    .service(activate_account)
+                    .service(get_user_data)
+                    .service(change_password)
+                    .service(get_delete_mail)
+                    .service(delete_acc),
+            )
+            .service(
+                web::scope("/menu")
+                    .service(get_menu_all)
+                    .service(get_menu_item)
+                    .service(get_menu_today)
+                    .service(get_menu_day)
+                    .service(update),
+            );
         App::new()
             .wrap(logger)
             .wrap(cors)
             .app_data(state.clone())
-            .service(
-                web::scope("/api")
-                    .service(
-                        web::scope("/user")
-                            .service(login)
-                            .service(register)
-                            .service(activate_account)
-                            .service(get_user_data)
-                            .service(change_password)
-                            .service(get_delete_mail)
-                            .service(delete_acc),
-                    )
-                    .service(
-                        web::scope("/menu")
-                            .service(get_menu_all)
-                            .service(get_menu_item)
-                            .service(get_menu_today)
-                            .service(get_menu_day)
-                            .service(update),
-                    ),
-            )
+            .service(routes)
     })
     .bind(("127.0.0.1", 4765))? //arbitrary port used
     .run()
