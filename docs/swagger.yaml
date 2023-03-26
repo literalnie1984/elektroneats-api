@@ -112,10 +112,6 @@ paths:
             "*/*":
               schema:
                 $ref: "#/components/schemas/MenuVec"
-        "400":
-          description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
   "/menu/day/{day}":
@@ -127,10 +123,6 @@ paths:
             "*/*":
               schema:
                 $ref: "#/components/schemas/MenuVec"
-        "400":
-          description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
       parameters:
@@ -150,10 +142,6 @@ paths:
             "*/*":
               schema:
                  $ref: "#/components/schemas/MenuVec"
-        "400":
-          description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
   /menu/update:
@@ -166,10 +154,6 @@ paths:
               schema:
                 type: string
                 example: Success message
-        "400":
-          description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
   "/menu/{item_id}":
@@ -196,8 +180,6 @@ paths:
                 example: Success message
         "400":
           description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
       parameters:
@@ -300,8 +282,6 @@ paths:
                 example: Success message
         "400":
           description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
       requestBody:
@@ -322,8 +302,6 @@ paths:
                 example: Success message
         "400":
           description: Bad Request
-        "401":
-          description: Unauthorized
         "500":
           description: Internal Server Error
       requestBody:
