@@ -94,6 +94,7 @@ async fn get_delete_mail(
 
 #[get("/delete/{token}")]
 async fn delete_acc(
+    _user: AuthUser,
     data: web::Data<AppState>,
     token: Path<String>,
 ) -> Result<impl Responder, ServiceError> {
@@ -199,7 +200,7 @@ async fn activate_account(
     data: web::Data<AppState>,
 ) -> Result<String, ServiceError> {
     let tokens = data.activators_reg.read().await;
-    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::InternalError)};
+    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
     let conn = &data.conn;
     let user_query = User::find()
         .filter(user::Column::Email.eq(email))
