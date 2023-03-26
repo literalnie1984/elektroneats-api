@@ -1,3 +1,4 @@
+use actix_web::http::header;
 use async_std::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,6 +8,7 @@ use actix_web::{web, App, HttpServer};
 use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
+use actix_cors::Cors;
 
 use kantyna_api::appstate::AppState;
 
@@ -31,28 +33,36 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let logger = Logger::default();
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE]);
 
-        App::new().wrap(logger).app_data(state.clone()).service(
-            web::scope("/api")
-                .service(
-                    web::scope("/user")
-                        .service(login)
-                        .service(register)
-                        .service(activate_account)
-                        .service(get_user_data)
-                        .service(change_password)
-                        .service(get_delete_mail)
-                        .service(delete_acc),
-                )
-                .service(
-                    web::scope("/menu")
-                        .service(get_menu_all)
-                        .service(get_menu_item)
-                        .service(get_menu_today)
-                        .service(get_menu_day)
-                        .service(update),
-                ),
-        )
+        App::new()
+            .wrap(logger)
+            .wrap(cors)
+            .app_data(state.clone())
+            .service(
+                web::scope("/api")
+                    .service(
+                        web::scope("/user")
+                            .service(login)
+                            .service(register)
+                            .service(activate_account)
+                            .service(get_user_data)
+                            .service(change_password)
+                            .service(get_delete_mail)
+                            .service(delete_acc),
+                    )
+                    .service(
+                        web::scope("/menu")
+                            .service(get_menu_all)
+                            .service(get_menu_item)
+                            .service(get_menu_today)
+                            .service(get_menu_day)
+                            .service(update),
+                    ),
+            )
     })
     .bind(("127.0.0.1", 4765))? //arbitrary port used
     .run()
