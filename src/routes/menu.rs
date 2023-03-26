@@ -1,5 +1,6 @@
 use std::mem;
 
+use crate::routes::structs;
 use actix_web::Responder;
 use chrono::Datelike;
 use entity::{
@@ -7,8 +8,9 @@ use entity::{
     prelude::{Dinner, Extras, ExtrasDinner},
 };
 use log::error;
-use paperclip::actix::{api_v2_operation, web};
+use paperclip::actix::{api_v2_operation, web, Apiv2Schema};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter};
+use serde::Serialize;
 
 use crate::{
     appstate::AppState,
@@ -16,11 +18,33 @@ use crate::{
     scraper::{scrape_menu, update_menu},
 };
 
-type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
+#[derive(Apiv2Schema, Serialize)]
+pub struct MenuVec(Vec<MenuVecInner>);
+#[derive(Apiv2Schema, Serialize)]
+pub struct MenuVecInner(structs::Dinner, Vec<structs::Extras>);
+type MenuResult = Result<web::Json<MenuVec>, ServiceError>;
 
-/*
-#[api_v2_operation]
 async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult {
+    fn dinner_model_to_dinner(dinner_model: dinner::Model) -> structs::Dinner {
+        structs::Dinner {
+            id: dinner_model.id,
+            name: dinner_model.name,
+            price: dinner_model.price.to_string().parse().unwrap(),
+            image: dinner_model.image,
+            week_day: dinner_model.week_day,
+            max_supply: dinner_model.max_supply,
+            r#type: dinner_model.r#type.into(),
+        }
+    }
+
+    fn extras_model_to_extras(extras_model: extras::Model) -> structs::Extras {
+        structs::Extras {
+            id: extras_model.id,
+            name: extras_model.name,
+            price: extras_model.price.to_string().parse().unwrap(),
+        }
+    }
+
     let dinners = match day {
         Some(day) => Dinner::find()
             .filter(dinner::Column::WeekDay.eq(day))
@@ -44,11 +68,20 @@ async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult {
             ServiceError::InternalError
         })?;
 
-    let response = dinners
-        .iter()
-        .zip(extras.iter_mut())
-        .map(|(dinner, extras)| (dinner.clone(), mem::take(extras)))
-        .collect::<Vec<_>>();
+    let response: MenuVec = MenuVec(
+        dinners
+            .iter()
+            .zip(extras.iter_mut())
+            .map(|(dinner, extras)| {
+                let dinners = dinner_model_to_dinner(dinner.clone());
+                let extras: Vec<structs::Extras> = extras
+                    .iter()
+                    .map(|e| extras_model_to_extras(e.clone()))
+                    .collect();
+                MenuVecInner(dinners, extras)
+            })
+            .collect::<Vec<_>>(),
+    );
 
     Ok(web::Json(response))
 }
@@ -71,7 +104,6 @@ pub async fn get_menu_day(day: web::Path<u8>, data: web::Data<AppState>) -> Menu
 
     get_menu(&data.conn, Some(day)).await
 }
-*/
 
 #[api_v2_operation]
 pub async fn get_menu_item(item_id: web::Path<u32>) -> impl Responder {

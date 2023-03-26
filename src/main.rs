@@ -8,9 +8,8 @@ use kantyna_api::routes::menu::*;
 use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
 use paperclip::actix::{
-    api_v2_operation,
     web::{self, Json},
-    Apiv2Schema, OpenApiExt,
+    OpenApiExt,
 };
 
 use kantyna_api::appstate::AppState;
@@ -65,15 +64,15 @@ async fn main() -> std::io::Result<()> {
                     )
                     .service(
                         web::scope("/menu")
-                            // .service(web::resource("/").route(web::get().to(get_menu_all)))
-                            // .service(web::resource("/today").route(web::get().to(get_menu_today)))
-                            // .service(
-                            //     web::resource("/{item_id}").route(web::get().to(get_menu_item)),
-                            // )
-                            // .service(
-                            //     web::resource("/day/{day:[0-9]}")
-                            //         .route(web::get().to(get_menu_day)),
-                            // )
+                            .service(web::resource("/").route(web::get().to(get_menu_all)))
+                            .service(web::resource("/today").route(web::get().to(get_menu_today)))
+                            .service(
+                                web::resource("/{item_id}").route(web::get().to(get_menu_item)),
+                            )
+                            .service(
+                                web::resource("/day/{day:[0-9]}")
+                                    .route(web::get().to(get_menu_day)),
+                            )
                             .service(
                                 web::resource("/update").route(web::get().to(get_menu_update)),
                             ),
