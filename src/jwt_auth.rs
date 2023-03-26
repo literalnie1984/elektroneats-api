@@ -3,6 +3,7 @@ use actix_web::FromRequest;
 use chrono::Utc;
 use jsonwebtoken::errors::Error as JwtError;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use paperclip::actix::Apiv2Schema;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::ServiceError;
@@ -11,6 +12,7 @@ use crate::errors::ServiceError;
 const JWT_SECRET: &[u8] =
     "gioryegioergb389458y85w4huuhierghlgrezhlgh89y5w48954w4w5huoiyh".as_bytes();
 
+#[derive(Apiv2Schema)]
 pub struct AuthUser {
     pub id: i32,
 }

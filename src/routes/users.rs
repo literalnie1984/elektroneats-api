@@ -1,8 +1,8 @@
-use actix_web::web::Path;
-use actix_web::{get, post, web, Responder};
+use actix_web::{get, post, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport, Message};
+use paperclip::actix::{api_v2_operation, web, web::Path};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -22,8 +22,8 @@ use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
 use log::error;
 
-#[post("/change-password")]
-async fn change_password(
+#[api_v2_operation]
+pub async fn change_password(
     user: AuthUser,
     data: web::Data<AppState>,
     pass_data: web::Json<UserChangePassword>,
@@ -59,8 +59,11 @@ async fn change_password(
     }
 }
 
-#[get("/get-user-data")]
-async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
+#[api_v2_operation]
+pub async fn get_user_data(
+    user: AuthUser,
+    data: web::Data<AppState>,
+) -> Result<String, ServiceError> {
     let conn = &data.conn;
 
     let user_query = User::find()
@@ -74,11 +77,11 @@ async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Respon
     Ok(format!("User data: {}", user.username))
 }
 
-#[get("/delete")]
-async fn get_delete_mail(
+#[api_v2_operation]
+pub async fn get_delete_mail(
     user: AuthUser,
     data: web::Data<AppState>,
-) -> Result<impl Responder, ServiceError> {
+) -> Result<String, ServiceError> {
     let conn = &data.conn;
 
     let user_query = User::find()
@@ -92,11 +95,11 @@ async fn get_delete_mail(
     send_verification_mail(&user.email, &data.activators_del, VerificationType::Delete).await
 }
 
-#[get("/delete/{token}")]
-async fn delete_acc(
+#[api_v2_operation]
+pub async fn delete_acc(
     data: web::Data<AppState>,
     token: Path<String>,
-) -> Result<impl Responder, ServiceError> {
+) -> Result<String, ServiceError> {
     let tokens = data.activators_del.read().await;
     let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
     let conn = &data.conn;
@@ -114,14 +117,14 @@ async fn delete_acc(
         .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
 
     if res.rows_affected == 1 {
-        Ok("Deleted account successfully")
+        Ok("Deleted account successfully".into())
     } else {
         Err(ServiceError::InternalError)
     }
 }
 
-#[post("/login")]
-async fn login(
+#[api_v2_operation]
+pub async fn login(
     user: web::Json<UserLogin>,
     data: web::Data<AppState>,
 ) -> Result<String, ServiceError> {
@@ -153,8 +156,11 @@ async fn login(
     }
 }
 
-#[post("/register")]
-async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> impl Responder {
+#[api_v2_operation]
+pub async fn register(
+    user: web::Json<UserRegister>,
+    data: web::Data<AppState>,
+) -> Result<String, ServiceError> {
     let conn = &data.conn;
 
     let user = user.into_inner();
@@ -193,8 +199,8 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
     .await
 }
 
-#[get("/activate/{token}")]
-async fn activate_account(
+#[api_v2_operation]
+pub async fn activate_account(
     token: Path<String>,
     data: web::Data<AppState>,
 ) -> Result<String, ServiceError> {

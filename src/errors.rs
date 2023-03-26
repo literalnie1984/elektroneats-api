@@ -1,7 +1,13 @@
-use actix_web::{error::ResponseError, HttpResponse, http::{header::ContentType, StatusCode}};
-use derive_more::{Display};
+use actix_web::{
+    error::ResponseError,
+    http::{header::ContentType, StatusCode},
+    HttpResponse,
+};
+use derive_more::Display;
+use paperclip::actix::api_v2_errors;
 
 #[derive(Debug, Display)]
+#[api_v2_errors(code = 500, code = 400, code = 401, code = 401)]
 pub enum ServiceError {
     #[display(fmt = "An internal error occurred. Please try again later.")]
     InternalError,
@@ -20,10 +26,7 @@ impl ResponseError for ServiceError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.status_code())
             .insert_header(ContentType::json())
-            .body(
-                serde_json::json!({ "error": self.to_string() })
-                .to_string()
-            )
+            .body(serde_json::json!({ "error": self.to_string() }).to_string())
     }
 
     fn status_code(&self) -> StatusCode {
