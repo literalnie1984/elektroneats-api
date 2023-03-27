@@ -105,6 +105,7 @@ servers:
 paths:
   /menu/:
     get:
+      summary: gets full menu array
       responses:
         "200":
           description: OK
@@ -116,6 +117,7 @@ paths:
           description: Internal Server Error
   "/menu/day/{day}":
     get:
+      summary: gets menu array for given day
       responses:
         "200":
           description: OK
@@ -135,6 +137,7 @@ paths:
             pattern: "[0-9]"
   /menu/today:
     get:
+      summary: gets full menu array for today
       responses:
         "200":
           description: OK
@@ -146,6 +149,7 @@ paths:
           description: Internal Server Error
   /menu/update:
     get:
+      summary: scrapes menu site and loads it into DB
       responses:
         "200":
           description: OK
@@ -158,6 +162,7 @@ paths:
           description: Internal Server Error
   "/menu/{item_id}":
     get:
+      summary: TODO
       responses:
         "418":
           description: TODO
@@ -170,6 +175,7 @@ paths:
             format: int32
   "/user/activate/{token}":
     get:
+      summary: activates user account with token generated during register
       responses:
         "200":
           description: OK
@@ -190,8 +196,7 @@ paths:
             type: string
   /user/change-password:
     post:
-      security:
-        - userAuth: []
+      summary: changes password for given logged-in user
       responses:
         "200":
           description: OK
@@ -206,14 +211,25 @@ paths:
           description: Unauthorized
         "500":
           description: Internal Server Error
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer <JWT Token>
+          schema:
+            type: string
+            format: JWT
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/UserChangePassword"
         required: true
+      security:
+        - userAuth: []
   /user/delete:
     get:
+      summary: Sends delete account email to given currently logged-in user
       security:
         - userAuth: []
       responses:
@@ -230,8 +246,17 @@ paths:
           description: Unauthorized
         "500":
           description: Internal Server Error
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer <JWT Token>
+          schema:
+            type: string
+            format: JWT
   "/user/delete/{token}":
     get:
+      summary: deletes account, token generated in /user/delete
       responses:
         "200":
           description: OK
@@ -254,6 +279,7 @@ paths:
             type: string
   /user/get-user-data:
     get:
+      summary: gets data about given user
       security:
         - userAuth: []
       responses:
@@ -270,8 +296,17 @@ paths:
           description: Unauthorized
         "500":
           description: Internal Server Error
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Bearer <JWT Token>
+          schema:
+            type: string
+            format: JWT
   /user/login:
     post:
+      summary: tries to log-in given user
       responses:
         "200":
           description: OK
@@ -279,7 +314,7 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: Success message
+                example: <JWT token>
         "400":
           description: Bad Request
         "500":
@@ -292,6 +327,7 @@ paths:
         required: true
   /user/register:
     post:
+      summary: tries to register given user
       responses:
         "200":
           description: OK
@@ -312,4 +348,4 @@ paths:
         required: true
 info:
   version: ""
-  title: ""
+  title: "Kantyna-app"
