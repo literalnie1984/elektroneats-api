@@ -44,6 +44,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Extras::Name).string().not_null())
                     .col(ColumnDef::new(Extras::Price).decimal_len(6, 2).not_null())
+                    .col(ColumnDef::new(Extras::Image).string().not_null())
                     .to_owned(),
             )
             .await?;
@@ -81,6 +82,7 @@ enum Extras {
     Id,
     Name,
     Price,
+    Image,
 }
 
 /* #[derive(Iden, EnumIter)]

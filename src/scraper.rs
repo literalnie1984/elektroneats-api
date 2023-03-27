@@ -166,16 +166,19 @@ pub async fn update_menu(
         extras::ActiveModel {
             name: Set("Ziemniaki".into()),
             price: Set(Decimal::new(10, 1)),
+            image: Set("TODO".into()),
             ..Default::default()
         },
         extras::ActiveModel {
             name: Set("Surówka".into()),
             price: Set(Decimal::new(10, 1)),
+            image: Set("TODO".into()),
             ..Default::default()
         },
         extras::ActiveModel {
             name: Set("Kompot".into()),
             price: Set(Decimal::new(05, 1)),
+            image: Set("TODO".into()),
             ..Default::default()
         },
     ];
@@ -227,6 +230,7 @@ pub async fn update_menu(
                 let res = extras::Entity::insert(extras::ActiveModel {
                     name: Set(other_extra),
                     price: Set(Decimal::new(10, 1)),
+                    image: Set("TODO".into()),
                     ..Default::default()
                 })
                 .exec(conn)

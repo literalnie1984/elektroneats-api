@@ -11,6 +11,7 @@ pub struct Model {
     pub name: String,
     #[sea_orm(column_type = "Decimal(Some((6, 2)))")]
     pub price: Decimal,
+    pub image: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
