@@ -1,4 +1,6 @@
+use chrono::{Date, NaiveDate, NaiveDateTime, DateTime, Utc};
 use serde::{Serialize, Deserialize};
+use chrono::serde::ts_seconds;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,4 +29,6 @@ pub struct UserChangePassword {
 pub struct OrderRequest {
     pub dinner_id: i32,
     pub extras_ids: Vec<i32>,
+    #[serde(with = "ts_seconds")]
+    pub collection_date: DateTime<Utc>,
 }
