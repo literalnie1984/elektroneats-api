@@ -1,5 +1,6 @@
 use actix_web::http::header;
 use async_std::sync::RwLock;
+use kantyna_api::routes::order::create_order;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -50,6 +51,11 @@ async fn main() -> std::io::Result<()> {
                     .service(change_password)
                     .service(get_delete_mail)
                     .service(delete_acc),
+            )
+            .service(
+                web::scope("/orders")
+                    .service(create_order),
+
             )
             .service(
                 web::scope("/menu")
