@@ -35,7 +35,7 @@ impl MigrationTrait for Migration {
             .create_foreign_key(
                 sea_query::ForeignKey::create()
                     .name("FK_extrasOrder_UDO")
-                    .from(ExtrasOrder::Table, ExtrasOrder::Id)
+                    .from(ExtrasOrder::Table, ExtrasOrder::UserDinnerId)
                     .to(UserDinnerOrders::Table, UserDinnerOrders::Id)
                     .on_delete(ForeignKeyAction::Restrict)
                     .on_update(ForeignKeyAction::Restrict)
@@ -113,6 +113,8 @@ enum DinnerOrders {
 enum ExtrasOrder {
     Table,
     Id,
+    UserDinnerId,
+    ExtrasId,
 }
 
 #[derive(Iden)]
