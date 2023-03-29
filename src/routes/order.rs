@@ -12,20 +12,19 @@ async fn create_order(user: AuthUser, data: web::Data<AppState>, order: web::Jso
     let order = order.into_inner();
     let user_id = user.id;
 
-    let tz_offset = FixedOffset::east_opt(2 * 3600).unwrap();
-    let dt_with_tz: DateTime<FixedOffset> = tz_offset.from_utc_datetime(&order.collection_date.naive_utc());
+    // let tz_offset = FixedOffset::east_opt(2 * 3600).unwrap();
+    // let dt_with_tz: DateTime<FixedOffset> = tz_offset.from_utc_datetime(&order.collection_date.naive_utc());
 
-    Ok(format!("Cool date: {}", dt_with_tz))
+    let dinner_order = dinner_orders::ActiveModel {
+        user_id: Set(user_id),
+        collection_date: Set(order.collection_date),
+        ..Default::default()
+    };
 
-    // let dinner_orders = dinner_orders::ActiveModel {
-    //     user_id: Set(user_id),
-    //     collection_date: Set(chrono::),
-    //     ..Default::default()
-    // };
+    let result = dinner_orders::Entity::insert(dinner_order).exec(db).await.map_err(|e| {
+        error!("Database error creating order: {}", e);
+        ServiceError::InternalError
+    })?;
 
-    // let result = dinner_orders::Entity::insert(dinner_orders).exec(db).await.map_err(|e| {
-    //     error!("Database error creating order: {}", e);
-    //     ServiceError::InternalError
-    // })?;
-
+    Ok(format!("Order created with id: {}", result.last_insert_id))
 }

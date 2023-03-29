@@ -26,7 +26,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(DinnerOrders::CollectionDate)
-                            .date()
+                            .timestamp()
                             .not_null(),
                     )
                     .col(ColumnDef::new(DinnerOrders::Completed).boolean().not_null())
