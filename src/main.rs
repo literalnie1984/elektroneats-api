@@ -1,6 +1,6 @@
 use actix_web::http::header;
 use async_std::sync::RwLock;
-use kantyna_api::routes::order::create_order;
+use kantyna_api::routes::order::{create_order, get_user_orders};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -54,7 +54,8 @@ async fn main() -> std::io::Result<()> {
             )
             .service(
                 web::scope("/orders")
-                    .service(create_order),
+                    .service(create_order)
+                    .service(get_user_orders),
 
             )
             .service(

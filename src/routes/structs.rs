@@ -1,4 +1,5 @@
-use chrono::{Date, NaiveDate, NaiveDateTime, DateTime, Utc};
+use chrono::{DateTime, Utc};
+use entity::{dinner, extras};
 use serde::{Serialize, Deserialize};
 use chrono::serde::ts_seconds;
 
@@ -37,4 +38,20 @@ pub struct OrderRequest {
     pub dinners: Vec<Dinner>,
     #[serde(with = "ts_seconds")]
     pub collection_date: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DinnerResponse{
+    pub dinner: dinner::Model,
+    pub extras: Vec<extras::Model>,
+}
+
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderResponse {
+    #[serde(with = "ts_seconds")]
+    pub collection_date: DateTime<Utc>,
+    pub dinners: Vec<DinnerResponse>,
 }
