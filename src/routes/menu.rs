@@ -2,36 +2,42 @@ use std::mem;
 
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
-use entity::{dinner,extras, prelude::{Dinner, Extras, ExtrasDinner}};
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection};
+use entity::{
+    dinner, extras,
+    prelude::{Dinner, Extras, ExtrasDinner},
+};
 use log::error;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter};
 
-use crate::{errors::ServiceError, appstate::AppState, scraper::{update_menu, scrape_menu}};
+use crate::{
+    appstate::AppState,
+    errors::ServiceError,
+    map_db_err,
+    scraper::{scrape_menu, update_menu},
+};
 
 type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
 
-async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult{
-    
+async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult {
     let dinners = match day {
-        Some(day) => Dinner::find().filter(dinner::Column::WeekDay.eq(day)).all(conn).await.map_err(|e| {
-            error!("Database error getting menu: {}", e);
-            ServiceError::InternalError
-        })?,
-        None => Dinner::find().all(conn).await.map_err(|e| {
-            error!("Database error getting menu: {}", e);
-            ServiceError::InternalError
-        })?,
+        Some(day) => Dinner::find()
+            .filter(dinner::Column::WeekDay.eq(day))
+            .all(conn)
+            .await
+            .map_err(map_db_err)?,
+        None => Dinner::find().all(conn).await.map_err(map_db_err)?,
     };
-    
-    let mut extras  = dinners.load_many_to_many(Extras, ExtrasDinner, conn).await.map_err(|e| {
-        error!("Database error getting menu: {}", e);
-        ServiceError::InternalError
-    })?;
 
-    let response = dinners.iter().zip(extras.iter_mut())
-        .map(|(dinner, extras)| {
-            (dinner.clone(), mem::take(extras))
-        }).collect::<Vec<_>>();
+    let mut extras = dinners
+        .load_many_to_many(Extras, ExtrasDinner, conn)
+        .await
+        .map_err(map_db_err)?;
+
+    let response = dinners
+        .iter()
+        .zip(extras.iter_mut())
+        .map(|(dinner, extras)| (dinner.clone(), mem::take(extras)))
+        .collect::<Vec<_>>();
 
     Ok(web::Json(response))
 }

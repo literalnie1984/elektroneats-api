@@ -689,6 +689,19 @@
   <script>
     // Script section to load models into a JS Var
     var defs = {}
+            defs["inline_response_200"] = {
+  "type" : "object",
+  "properties" : {
+    "username" : {
+      "type" : "string",
+      "example" : "Jan Jakub"
+    },
+    "admin" : {
+      "type" : "boolean",
+      "example" : false
+    }
+  }
+};
             defs["MenuVec"] = {
   "type" : "array",
   "items" : {
@@ -3629,7 +3642,7 @@ public class DefaultApiExample {
         DefaultApi apiInstance = new DefaultApi();
         String authorization = authorization_example; // String | Bearer <JWT Token>
         try {
-            'String' result = apiInstance.userGetUserDataGet(authorization);
+            inline_response_200 result = apiInstance.userGetUserDataGet(authorization);
             System.out.println(result);
         } catch (ApiException e) {
             System.err.println("Exception when calling DefaultApi#userGetUserDataGet");
@@ -3648,7 +3661,7 @@ public class DefaultApiExample {
         DefaultApi apiInstance = new DefaultApi();
         String authorization = authorization_example; // String | Bearer <JWT Token>
         try {
-            'String' result = apiInstance.userGetUserDataGet(authorization);
+            inline_response_200 result = apiInstance.userGetUserDataGet(authorization);
             System.out.println(result);
         } catch (ApiException e) {
             System.err.println("Exception when calling DefaultApi#userGetUserDataGet");
@@ -3669,7 +3682,7 @@ DefaultApi *apiInstance = [[DefaultApi alloc] init];
 
 // gets data about given user
 [apiInstance userGetUserDataGetWith:authorization
-              completionHandler: ^('String' output, NSError* error) {
+              completionHandler: ^(inline_response_200 output, NSError* error) {
                             if (output) {
                                 NSLog(@"%@", output);
                             }
@@ -3723,7 +3736,7 @@ namespace Example
             try
             {
                 // gets data about given user
-                'String' result = apiInstance.userGetUserDataGet(authorization);
+                inline_response_200 result = apiInstance.userGetUserDataGet(authorization);
                 Debug.WriteLine(result);
             }
             catch (Exception e)
@@ -3851,9 +3864,7 @@ except ApiException as e:
   "content" : {
     "text/plain" : {
       "schema" : {
-        "type" : "string",
-        "example" : "Success message",
-        "x-content-type" : "text/plain"
+        "$ref" : "#/components/schemas/inline_response_200"
       }
     }
   }

@@ -10,10 +10,11 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
+use serde::Serialize;
 
 use crate::appstate::{ActivatorsVec, AppState};
-use crate::convert_err_to_500;
 use crate::enums::VerificationType;
+use crate::{convert_err_to_500, map_db_err};
 
 use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
@@ -34,7 +35,7 @@ async fn change_password(
         .filter(user::Column::Id.eq(user.id))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     let Some(user) = user_query else {return Err(ServiceError::BadRequest( "Account does not exist".to_string(),))};
 
@@ -61,17 +62,26 @@ async fn change_password(
 
 #[get("/get-user-data")]
 async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
+    #[derive(Serialize)]
+    struct UserJson {
+        username: String,
+        admin: bool,
+    }
+
     let conn = &data.conn;
-    
+
     let user_query = User::find()
         .filter(user::Column::Id.eq(user.id))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
-    Ok(format!("User data: {}", user.username))
+    Ok(web::Json(UserJson {
+        username: user.username,
+        admin: user.admin != 0,
+    }))
 }
 
 #[get("/delete")]
@@ -85,7 +95,7 @@ async fn get_delete_mail(
         .filter(user::Column::Id.eq(user.id))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
@@ -105,14 +115,11 @@ async fn delete_acc(
         .filter(user::Column::Email.eq(email))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     let Some(user) = user_query else {return Err(ServiceError::InternalError)};
 
-    let res = user
-        .delete(conn)
-        .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+    let res = user.delete(conn).await.map_err(map_db_err)?;
 
     if res.rows_affected == 1 {
         Ok("Deleted account successfully")
@@ -132,7 +139,7 @@ async fn login(
         .filter(user::Column::Email.eq(user.email))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
     let result = verify(&user.password, &user_query.password).unwrap();
@@ -164,7 +171,7 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
         .filter(user::Column::Email.eq(&user.email))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     if user_query.is_some() {
         return Err(ServiceError::BadRequest(
@@ -184,7 +191,7 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
     }
     .save(conn)
     .await
-    .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+    .map_err(map_db_err)?;
 
     send_verification_mail(
         &user.email,
@@ -206,15 +213,13 @@ async fn activate_account(
         .filter(user::Column::Email.eq(email))
         .one(conn)
         .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+        .map_err(map_db_err)?;
 
     let Some(user) = user_query else {return Err(ServiceError::InternalError)};
     let mut user: user::ActiveModel = user.into();
     user.verified = Set(true as i8);
 
-    user.update(conn)
-        .await
-        .map_err(|err| convert_err_to_500(err, Some("Database error")))?;
+    user.update(conn).await.map_err(map_db_err)?;
 
     Ok("account verified successfully".to_string())
 }

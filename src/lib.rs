@@ -18,3 +18,10 @@ where
     error!("{}: {}", msg, err);
     ServiceError::InternalError
 }
+
+pub fn map_db_err<E>(err: E) -> ServiceError
+where
+    E: Display,
+{
+    convert_err_to_500(err, Some("Database error"))
+}

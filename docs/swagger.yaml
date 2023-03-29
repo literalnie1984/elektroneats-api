@@ -288,8 +288,14 @@ paths:
           content:
             text/plain:
               schema:
-                type: string
-                example: Success message
+                type: object
+                properties:
+                  username:
+                    type: string
+                    example: Jan Jakub
+                  admin:
+                    type: boolean
+                    example: false
         "400":
           description: Bad Request
         "401":
@@ -349,3 +355,4 @@ paths:
 info:
   version: ""
   title: "Kantyna-app"
+
