@@ -112,7 +112,8 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
         .map_err(|err| convert_err_to_500(err, Some("Fetch site err")))?;
 
     let document = Html::parse_document(&site_data);
-    let tr_selector = Selector::parse(".xl7624020").unwrap();
+    let tr_selector = Selector::parse("tr[height=\"22\"]").unwrap(); //class on them changes,
+                                                                     //height (hopefully) remains
     let td_selector = Selector::parse("td").unwrap();
     let dishes = document.select(&tr_selector);
 
@@ -139,8 +140,9 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
             thu_to_sat.push(vec);
         } else {
             if let Some(txt) = vec.iter().nth(0) {
-                if txt == "kompot" {
+                if txt == "CZWARTEK" {
                     is_wed = true;
+                    continue;
                 }
             }
             mon_to_wed.push(vec);

@@ -33,6 +33,8 @@ async fn main() -> std::io::Result<()> {
         activators_del: Arc::new(RwLock::new(HashMap::new())),
     });
 
+    // let mut ssl =
+
     HttpServer::new(move || {
         let logger = Logger::default();
         let cors = Cors::default()
