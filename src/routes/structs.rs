@@ -26,9 +26,15 @@ pub struct UserChangePassword {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OrderRequest {
+pub struct Dinner{
     pub dinner_id: i32,
     pub extras_ids: Vec<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderRequest {
+    pub dinners: Vec<Dinner>,
     #[serde(with = "ts_seconds")]
     pub collection_date: DateTime<Utc>,
 }
