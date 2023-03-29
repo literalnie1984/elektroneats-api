@@ -3,6 +3,8 @@
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
 
+use crate::sea_orm_active_enums::ExtrasType;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
 #[sea_orm(table_name = "extras")]
 pub struct Model {
@@ -12,6 +14,7 @@ pub struct Model {
     #[sea_orm(column_type = "Decimal(Some((6, 2)))")]
     pub price: Decimal,
     pub image: String,
+    pub r#type: ExtrasType,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

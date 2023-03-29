@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::{convert_err_to_500, errors::ServiceError};
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
-const TWO_PARTS_DISHES_PREFIXES: [&'static str; 3] = ["po ", "i ", "opiekane "];
+const TWO_PARTS_DISHES_PREFIXES: [&'static str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MenuDay {
@@ -153,6 +153,7 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     weekly_menu.append(&mut vec_to_menu(mon_to_wed));
     weekly_menu.append(&mut vec_to_menu(thu_to_sat));
 
+    eprintln!("{:?}", weekly_menu);
     Ok(weekly_menu)
 }
 
@@ -169,18 +170,21 @@ pub async fn update_menu(
             name: Set("Ziemniaki".into()),
             price: Set(Decimal::new(10, 1)),
             image: Set("TODO".into()),
+            r#type: Set(entity::sea_orm_active_enums::ExtrasType::Filler),
             ..Default::default()
         },
         extras::ActiveModel {
             name: Set("Surówka".into()),
             price: Set(Decimal::new(10, 1)),
             image: Set("TODO".into()),
+            r#type: Set(entity::sea_orm_active_enums::ExtrasType::Salad),
             ..Default::default()
         },
         extras::ActiveModel {
             name: Set("Kompot".into()),
             price: Set(Decimal::new(05, 1)),
             image: Set("TODO".into()),
+            r#type: Set(entity::sea_orm_active_enums::ExtrasType::Beverage),
             ..Default::default()
         },
     ];
@@ -233,6 +237,7 @@ pub async fn update_menu(
                     name: Set(other_extra),
                     price: Set(Decimal::new(10, 1)),
                     image: Set("TODO".into()),
+                    r#type: Set(entity::sea_orm_active_enums::ExtrasType::Filler),
                     ..Default::default()
                 })
                 .exec(conn)
@@ -243,10 +248,8 @@ pub async fn update_menu(
                 None
             }
         };
-        dbg!(&additional);
 
         for dinner_idx in prev_last_insert_id..=curr_last {
-            eprint!("{dinner_idx} ");
             let mut single: Vec<_> = (1..=3)
                 .map(|idx| extras_dinner::ActiveModel {
                     dinner_id: Set(dinner_idx),

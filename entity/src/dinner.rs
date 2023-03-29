@@ -4,7 +4,7 @@ use super::sea_orm_active_enums::Type;
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Default)]
 #[sea_orm(table_name = "dinner")]
 #[serde(rename_all = "camelCase")]
 pub struct Model {

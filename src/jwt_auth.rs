@@ -104,5 +104,8 @@ fn decode_jwt_token(token: String) -> Result<AuthUser, ServiceError> {
         .map_err(|_| ServiceError::JWTInvalidToken)?;
     let is_admin = decoded.claims.is_admin;
 
-    Ok(AuthUser{id: uid, is_admin: is_admin})
+    Ok(AuthUser {
+        id: uid,
+        is_admin: is_admin,
+    })
 }
