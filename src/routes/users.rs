@@ -62,7 +62,7 @@ async fn change_password(
 #[get("/get-user-data")]
 async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
     let conn = &data.conn;
-
+    
     let user_query = User::find()
         .filter(user::Column::Id.eq(user.id))
         .one(conn)
@@ -138,7 +138,7 @@ async fn login(
     let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        let token = match create_jwt(user_query.id) {
+        let token = match create_jwt(user_query.id, user_query.admin) {
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);

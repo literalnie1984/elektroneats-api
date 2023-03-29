@@ -13,6 +13,7 @@ const JWT_SECRET: &[u8] =
 
 pub struct AuthUser {
     pub id: i32,
+    pub is_admin: bool,
 }
 
 impl FromRequest for AuthUser {
@@ -53,22 +54,23 @@ impl FromRequest for AuthUser {
             }
         };
 
-        let user_id = match decode_jwt_token(token.to_string()) {
+        let user = match decode_jwt_token(token.to_string()) {
             Ok(l) => l,
             Err(_) => return return_func(ServiceError::JWTInvalidToken),
         };
 
-        std::future::ready(Ok(AuthUser { id: user_id }))
+        std::future::ready(Ok(user))
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     sub: String,
+    is_admin: bool,
     exp: usize,
 }
 
-pub fn create_jwt(uid: i32) -> Result<String, JwtError> {
+pub fn create_jwt(uid: i32, is_admin: i8) -> Result<String, JwtError> {
     let expiration = Utc::now()
         .checked_add_signed(chrono::Duration::seconds(60))
         .expect("valid timestamp")
@@ -76,6 +78,7 @@ pub fn create_jwt(uid: i32) -> Result<String, JwtError> {
 
     let claims = Claims {
         sub: uid.to_string(),
+        is_admin: is_admin == 1,
         exp: expiration as usize,
     };
 
@@ -86,7 +89,7 @@ pub fn create_jwt(uid: i32) -> Result<String, JwtError> {
     )
 }
 
-fn decode_jwt_token(token: String) -> Result<i32, ServiceError> {
+fn decode_jwt_token(token: String) -> Result<AuthUser, ServiceError> {
     let decoded = decode::<Claims>(
         &token,
         &DecodingKey::from_secret(JWT_SECRET),
@@ -94,9 +97,12 @@ fn decode_jwt_token(token: String) -> Result<i32, ServiceError> {
     )
     .map_err(|_| ServiceError::JWTInvalidToken)?;
 
-    decoded
+    let uid = decoded
         .claims
         .sub
         .parse::<i32>()
-        .map_err(|_| ServiceError::JWTInvalidToken)
+        .map_err(|_| ServiceError::JWTInvalidToken)?;
+    let is_admin = decoded.claims.is_admin;
+
+    Ok(AuthUser{id: uid, is_admin: is_admin})
 }
