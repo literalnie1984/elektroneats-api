@@ -3,7 +3,7 @@ use std::mem;
 use actix_web::{post, web, get};
 use entity::{dinner_orders, user_dinner_orders, extras_order, dinner, extras};
 use log::{error, info};
-use sea_orm::{Set, EntityTrait, QueryFilter, ColumnTrait, LoaderTrait};
+use sea_orm::{Set, EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection};
 
 use crate::{jwt_auth::AuthUser, errors::ServiceError, routes::structs::{OrderRequest, DinnerResponse}, appstate::AppState};
 
@@ -55,13 +55,10 @@ async fn create_order(user: AuthUser, data: web::Data<AppState>, order: web::Jso
     Ok("Order created successfully".to_string())
 }
 
-#[get("/get-user-active-orders")]
-async fn get_user_orders(/*user: AuthUser,*/ data: web::Data<AppState>) -> Result<web::Json<Vec<OrderResponse>>, ServiceError>{
-    let db = &data.conn;
-    let user_id = 1;
-
+async fn get_user_orders(user_id: i32, db: &DatabaseConnection, realized: i8) -> Result<web::Json<Vec<OrderResponse>>, ServiceError>{
     let orders = dinner_orders::Entity::find()
         .filter(dinner_orders::Column::UserId.eq(user_id))
+        .filter(dinner_orders::Column::Completed.eq(realized))
         .all(db)
         .await
         .map_err(|e| {
@@ -102,4 +99,20 @@ async fn get_user_orders(/*user: AuthUser,*/ data: web::Data<AppState>) -> Resul
     }
 
     Ok(web::Json(response))
+}
+
+#[get("/completed-user-orders")]
+async fn get_completed_user_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<Vec<OrderResponse>>, ServiceError>{
+    let db = &data.conn;
+    let user_id = user.id;
+
+    get_user_orders(user_id, db, 1).await
+}
+
+#[get("/pending-user-orders")]
+async fn get_pending_user_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<Vec<OrderResponse>>, ServiceError>{
+    let db = &data.conn;
+    let user_id = user.id;
+
+    get_user_orders(user_id, db, 0).await
 }
