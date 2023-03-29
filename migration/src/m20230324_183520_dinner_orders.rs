@@ -21,7 +21,8 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(DinnerOrders::UserId)
                             .integer()
-                            .unique_key()
+                            // user can have multiple dinner orders
+                            // .unique_key()
                             .not_null(),
                     )
                     .col(
