@@ -7,7 +7,10 @@ use entity::{
     prelude::{Dinner, Extras, ExtrasDinner},
 };
 use log::error;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, LoaderTrait, QueryFilter,
+    RelationTrait, Statement,
+};
 
 use crate::{
     appstate::AppState,
@@ -17,30 +20,36 @@ use crate::{
 };
 
 type MenuResult3d = Result<web::Json<Vec<Vec<(dinner::Model, Vec<extras::Model>)>>>, ServiceError>;
-type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
+// type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
+type MenuResult = Result<web::Json<(Vec<dinner::Model>, Vec<extras::Model>)>, ServiceError>;
 
-async fn get_menu(conn: &DatabaseConnection, day: Option<u8>) -> MenuResult {
-    let dinners = match day {
-        Some(day) => Dinner::find()
-            .filter(dinner::Column::WeekDay.eq(day))
-            .all(conn)
-            .await
-            .map_err(map_db_err)?,
-        None => Dinner::find().all(conn).await.map_err(map_db_err)?,
-    };
-
-    let mut extras = dinners
-        .load_many_to_many(Extras, ExtrasDinner, conn)
+async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
+    let dinners = Dinner::find()
+        .filter(dinner::Column::WeekDay.eq(day))
+        .all(conn)
         .await
         .map_err(map_db_err)?;
 
-    let response = dinners
-        .iter()
-        .zip(extras.iter_mut())
-        .map(|(dinner, extras)| (dinner.clone(), mem::take(extras)))
-        .collect::<Vec<_>>();
+    let dinner_day_id = dinners[0].id;
+    let extras_for_day = Extras::find()
+        .from_raw_sql(
+            Statement::from_string(DbBackend::MySql,
+                format!(r#"select e.* from extras e join extras_dinner ed on ed.extras_id=e.id where ed.dinner_id = {};"#,dinner_day_id)))
+        .all(conn).await.map_err(map_db_err)?;
+    //REWRITE THIS IN SEAORM, ONLY HERE IN THIS STATE TEMPORARILY
 
-    Ok(web::Json(response))
+    /* let mut extras = dinners
+    .load_many_to_many(Extras, ExtrasDinner, conn)
+    .await
+    .map_err(map_db_err)?; */
+
+    /* let response = dinners
+    .iter()
+    .zip(extras.iter_mut())
+    .map(|(dinner, extras)| (dinner.clone(), mem::take(extras)))
+    .collect::<Vec<_>>(); */
+
+    Ok(web::Json((dinners, extras_for_day)))
 }
 
 async fn get_menu_3d(conn: &DatabaseConnection) -> MenuResult3d {
@@ -77,14 +86,14 @@ async fn get_menu_all(data: web::Data<AppState>) -> MenuResult3d {
 async fn get_menu_today(data: web::Data<AppState>) -> MenuResult {
     let curr_day = (chrono::offset::Local::now().date_naive().weekday() as u8).min(5);
 
-    get_menu(&data.conn, Some(curr_day)).await
+    get_menu(&data.conn, curr_day).await
 }
 
 #[get("/day/{day:[0-9]}")]
 async fn get_menu_day(day: web::Path<u8>, data: web::Data<AppState>) -> MenuResult {
     let day = day.into_inner().min(5) as u8;
 
-    get_menu(&data.conn, Some(day)).await
+    get_menu(&data.conn, day).await
 }
 
 #[get("/update")]
