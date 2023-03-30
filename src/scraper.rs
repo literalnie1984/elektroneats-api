@@ -153,7 +153,6 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     weekly_menu.append(&mut vec_to_menu(mon_to_wed));
     weekly_menu.append(&mut vec_to_menu(thu_to_sat));
 
-    eprintln!("{:?}", weekly_menu);
     Ok(weekly_menu)
 }
 

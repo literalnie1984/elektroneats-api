@@ -30,7 +30,12 @@ impl MigrationTrait for Migration {
                             .timestamp()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(DinnerOrders::Completed).boolean().not_null())
+                    .col(
+                        ColumnDef::new(DinnerOrders::Completed)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     /* .col(
                         ColumnDef::new(DinnerOrders::CollectionCode)
                             .integer()
