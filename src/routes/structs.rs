@@ -66,3 +66,10 @@ pub struct OrderResponse {
     pub collection_date: DateTime<Utc>,
     pub dinners: Vec<DinnerResponse>,
 }
+
+#[derive(Debug, Serialize)]
+pub struct UserWithOrders{
+    pub user_id: i32,
+    pub username: String,
+    pub orders: Vec<OrderResponse>,
+}

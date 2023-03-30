@@ -1,15 +1,12 @@
 use std::mem;
 
 use actix_web::{post, web, get};
-use chrono::{DateTime, Utc, serde::ts_seconds};
 use entity::{dinner_orders, user_dinner_orders, extras_order, dinner, extras, user};
-use log::{error, info};
-use sea_orm::{Set, EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection, ModelTrait};
-use serde::Serialize;
+use sea_orm::{Set, EntityTrait, QueryFilter, ColumnTrait, LoaderTrait, DatabaseConnection};
 
 use crate::{jwt_auth::AuthUser, errors::ServiceError, routes::structs::{OrderRequest, DinnerResponse}, appstate::AppState, map_db_err};
 
-use super::structs::OrderResponse;
+use super::structs::{OrderResponse, UserWithOrders};
 
 #[post("/create")]
 async fn create_order(user: AuthUser, data: web::Data<AppState>, order: web::Json<OrderRequest>) -> Result<String, ServiceError>{
@@ -23,10 +20,7 @@ async fn create_order(user: AuthUser, data: web::Data<AppState>, order: web::Jso
         ..Default::default()
     };
 
-    let dinner_order_res = dinner_orders::Entity::insert(dinner_order).exec(db).await.map_err(|e| {
-        error!("Database error creating dinner_orders: {}", e);
-        ServiceError::InternalError
-    })?;
+    let dinner_order_res = dinner_orders::Entity::insert(dinner_order).exec(db).await.map_err(map_db_err)?;
 
     for dinner in order.dinners {
         let dinner_order_junction = user_dinner_orders::ActiveModel {
@@ -35,10 +29,7 @@ async fn create_order(user: AuthUser, data: web::Data<AppState>, order: web::Jso
             ..Default::default()
         };
 
-        let dinner_order_res = user_dinner_orders::Entity::insert(dinner_order_junction).exec(db).await.map_err(|e| {
-            error!("Database error creating user_dinner_orders: {}", e);
-            ServiceError::InternalError
-        })?;
+        let dinner_order_res = user_dinner_orders::Entity::insert(dinner_order_junction).exec(db).await.map_err(map_db_err)?;
 
         let vector = dinner.extras_ids.into_iter().map(|extra_id|{
             extras_order::ActiveModel {
@@ -48,10 +39,7 @@ async fn create_order(user: AuthUser, data: web::Data<AppState>, order: web::Jso
             }
         }).collect::<Vec<_>>();
     
-        extras_order::Entity::insert_many(vector).exec(db).await.map_err(|e| {
-            error!("Database error creating extras_order: {}", e);
-            ServiceError::InternalError
-        })?;
+        extras_order::Entity::insert_many(vector).exec(db).await.map_err(map_db_err)?;
     }
 
     Ok("Order created successfully".to_string())
@@ -63,30 +51,18 @@ async fn get_user_orders(user_id: i32, db: &DatabaseConnection, realized: i8) ->
         .filter(dinner_orders::Column::Completed.eq(realized))
         .all(db)
         .await
-        .map_err(|e| {
-            error!("Database error getting user orders: {}", e);
-            ServiceError::InternalError
-        })?;
+        .map_err(map_db_err)?;
 
     let user_dinner_orders = orders.load_many(user_dinner_orders::Entity, db)
-        .await.map_err(|e| {
-            error!("Database error getting user orders: {}", e);
-            ServiceError::InternalError
-        })?;
+        .await.map_err(map_db_err)?;
     
     let mut response: Vec<OrderResponse> = Vec::new();
     for (order, user_dinner) in orders.into_iter().zip(user_dinner_orders.into_iter()) {
 
         let dinner = user_dinner.load_one(dinner::Entity, db)
-            .await.map_err(|e| {
-                error!("Database error getting user orders: {}", e);
-                ServiceError::InternalError
-            })?;
+            .await.map_err(map_db_err)?;
 
-        let extras = user_dinner.load_many_to_many(extras::Entity, extras_order::Entity, db).await.map_err(|e| {
-            error!("Database error getting user orders: {}", e);
-            ServiceError::InternalError
-        })?;
+        let extras = user_dinner.load_many_to_many(extras::Entity, extras_order::Entity, db).await.map_err(map_db_err)?;
 
         let mut dinners_with_extras = dinner.into_iter().zip(extras.into_iter()).map(|(dinner, extras)| {
             DinnerResponse{dinner: dinner.unwrap(), extras: extras}
@@ -120,26 +96,7 @@ async fn get_pending_user_orders(user: AuthUser, data: web::Data<AppState>) -> R
 }
 
 //TODO: ADD ADMIN RESTRICTION
-#[derive(Debug, Serialize)]
-struct DinnerOrder{
-    dinner: dinner::Model,
-    extras: Vec<extras::Model>,
-}
-
-#[derive(Debug, Serialize)]
-struct Order{
-    #[serde(with = "ts_seconds")]
-    collection_date: DateTime<Utc>,
-    dinner_orders: Vec<DinnerOrder>,
-}
-
-#[derive(Debug, Serialize)]
-struct UserWithOrders{
-    user_id: i32,
-    username: String,
-    orders: Vec<Order>,
-}
-
+//TODO: FIX RESPONSE REDUNDANCY
 #[get("/all-pending-orders")]
 async fn get_all_orders(data: web::Data<AppState>) -> Result<web::Json<Vec<UserWithOrders>>, ServiceError>{
     let db = &data.conn;
@@ -169,13 +126,13 @@ async fn get_all_orders(data: web::Data<AppState>) -> Result<web::Json<Vec<UserW
             let extras = user_dinner.load_many_to_many(extras::Entity, extras_order::Entity, db).await.map_err(map_db_err)?;
 
             let mut dinners_with_extras = dinner.into_iter().zip(extras.into_iter()).map(|(dinner, extras)| {
-                DinnerOrder{dinner: dinner.unwrap(), extras: extras}
+                DinnerResponse{dinner: dinner.unwrap(), extras: extras}
             }).collect::<Vec<_>>();
 
             output.last_mut().unwrap().orders.push(
-                Order {
+                OrderResponse {
                     collection_date: order.collection_date,
-                    dinner_orders: mem::take(&mut dinners_with_extras),
+                    dinners: mem::take(&mut dinners_with_extras),
                 }
             );
         }
