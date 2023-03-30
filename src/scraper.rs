@@ -7,7 +7,7 @@ use scraper::{Html, Selector};
 use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
 
-use crate::{convert_err_to_500, errors::ServiceError};
+use crate::{convert_err_to_500, errors::ServiceError, map_db_err};
 
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
 const TWO_PARTS_DISHES_PREFIXES: [&'static str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
@@ -156,14 +156,7 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     Ok(weekly_menu)
 }
 
-pub async fn update_menu(
-    conn: &DatabaseConnection,
-    mut menu: Vec<MenuDay>,
-) -> Result<(), ServiceError> {
-    let convert_db_err = |err| {
-        error!("Database err, {}", err);
-        ServiceError::InternalError
-    };
+pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), ServiceError> {
     let static_extras = vec![
         extras::ActiveModel {
             name: Set("Ziemniaki".into()),
@@ -190,8 +183,16 @@ pub async fn update_menu(
     extras::Entity::insert_many(static_extras)
         .exec(conn)
         .await
-        .map_err(convert_db_err)?;
+        .map_err(map_db_err)?;
 
+    Ok(())
+}
+
+pub async fn update_menu(
+    conn: &DatabaseConnection,
+    mut menu: Vec<MenuDay>,
+) -> Result<(), ServiceError> {
+    insert_static_extras(conn).await?;
     let mut prev_last_insert_id = 1;
     let mut extras_dinners_all: Vec<extras_dinner::ActiveModel> =
         Vec::with_capacity((3.5 * menu.len() as f32).round() as usize);
@@ -225,10 +226,7 @@ pub async fn update_menu(
         let res = dinner::Entity::insert_many(dinners)
             .exec(conn)
             .await
-            .map_err(convert_db_err)?;
-
-        //+2 bcs last_insert_id is weird, IDK don't ask me
-        let curr_last = res.last_insert_id + 2;
+            .map_err(map_db_err)?;
 
         let additional = {
             if let Some(other_extra) = menu.extras.clone() {
@@ -241,12 +239,15 @@ pub async fn update_menu(
                 })
                 .exec(conn)
                 .await
-                .map_err(convert_db_err)?;
+                .map_err(map_db_err)?;
                 Some(res.last_insert_id)
             } else {
                 None
             }
         };
+
+        //+2 bcs last_insert_id is weird, IDK don't ask me
+        let curr_last = res.last_insert_id + 2;
 
         for dinner_idx in prev_last_insert_id..=curr_last {
             let mut single: Vec<_> = (1..=3)
@@ -272,7 +273,7 @@ pub async fn update_menu(
     extras_dinner::Entity::insert_many(extras_dinners_all)
         .exec(conn)
         .await
-        .map_err(convert_db_err)?;
+        .map_err(map_db_err)?;
 
     Ok(())
 }

@@ -74,12 +74,11 @@ async fn get_menu_3d(conn: &DatabaseConnection) -> MenuResult3d {
             response.push(dinner_day);
             dinner_day = Vec::with_capacity(4);
             last_day = dinner.week_day;
-        } else {
-            dinner_day.push(DinnerWithExtras {
-                dinner: mem::take(dinner),
-                extras: mem::take(extras),
-            });
         }
+        dinner_day.push(DinnerWithExtras {
+            dinner: mem::take(dinner),
+            extras: mem::take(extras),
+        });
     }
     response.push(dinner_day);
 
