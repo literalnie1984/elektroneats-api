@@ -153,6 +153,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MenuDay"
+    Weekday:
+      type: string
+      enum:
+        - Monday
+        - Tuesday
+        - Wednesday
+        - Thursday
+        - Friday
+        - Saturday
+        - Sunday
+    UpdateMenu:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+        image:
+          type: string
+        max_supply:
+          type: integer
+          format: int32
+        week_day:
+          $ref: '#/components/schemas/Weekday'
+      required:
+        - id
   securitySchemes:
     userAuth:
       type: http
@@ -468,7 +498,51 @@ paths:
           description: Bad Request
         "500":
           description: Internal Server Error
+  /admin/update-dish:
+    put:
+      summary: updates given dish with given data
+      responses:
+        "200":
+          description: Success msg
+        "401":
+          description: Unauthorized
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateMenu"
+      parameters:
+          - in: header
+            name: Authorization
+            required: true
+            description: User must be an admin
+            schema:
+              type: string
+              format: JWT
+  /admin/claim/{id}:
+    get:
+      summary: Marks order with given id as claimed
+      responses:
+        "200":
+          description: Success msg
+        "401":
+          description: Unauthorized
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      parameters:
+          - in: header
+            name: Authorization
+            required: true
+            description: User must be an admin
+            schema:
+              type: string
+              format: JWT
 info:
   version: ""
   title: "Kantyna-app"
-
