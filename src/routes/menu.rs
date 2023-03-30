@@ -4,13 +4,14 @@ use actix_web::{get, web, Responder};
 use chrono::Datelike;
 use entity::{
     dinner, extras,
-    prelude::{Dinner, Extras, ExtrasDinner},
+    prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras,
 };
 use log::error;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
     Statement,
 };
+use sea_orm::ModelTrait;
 
 use crate::{
     appstate::AppState,
@@ -30,12 +31,21 @@ async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
         .await
         .map_err(map_db_err)?;
 
-    let dinner_day_id = dinners[0].id;
-    let extras = Extras::find()
-        .from_raw_sql(
-            Statement::from_string(DbBackend::MySql,
-                format!(r#"select e.* from extras e join extras_dinner ed on ed.extras_id=e.id where ed.dinner_id = {};"#,dinner_day_id)))
-        .all(conn).await.map_err(map_db_err)?;
+    if dinners.is_empty() {
+        return Err(ServiceError::NotFound("No dinners exists".to_string()));
+    }
+
+    let extras = dinners[0]
+        .find_linked(DinnerToExtras)
+        .all(conn)
+        .await
+        .map_err(map_db_err)?;
+
+    // let extras = Extras::find()
+    //     .from_raw_sql(
+    //         Statement::from_string(DbBackend::MySql,
+    //             format!(r#"select e.* from extras e join extras_dinner ed on ed.extras_id=e.id where ed.dinner_id = {};"#,dinner_day_id)))
+    //     .all(conn).await.map_err(map_db_err)?;
     //REWRITE THIS IN SEAORM, ONLY HERE IN THIS STATE TEMPORARILY
 
     /* let mut extras = dinners
