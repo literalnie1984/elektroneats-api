@@ -14,6 +14,7 @@ use serde::Serialize;
 
 use crate::appstate::{ActivatorsVec, AppState};
 use crate::enums::VerificationType;
+use crate::routes::structs::UserJson;
 use crate::{convert_err_to_500, map_db_err};
 
 use crate::errors::ServiceError;
@@ -62,12 +63,6 @@ async fn change_password(
 
 #[get("/get-user-data")]
 async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
-    #[derive(Serialize)]
-    struct UserJson {
-        username: String,
-        admin: bool,
-    }
-
     let conn = &data.conn;
 
     let user_query = User::find()

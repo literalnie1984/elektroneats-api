@@ -8,20 +8,20 @@ use entity::{
 };
 use log::error;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, LoaderTrait, QueryFilter,
-    RelationTrait, Statement,
+    ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    Statement,
 };
 
 use crate::{
     appstate::AppState,
     errors::ServiceError,
     map_db_err,
+    routes::structs::MenuOneDay,
     scraper::{scrape_menu, update_menu},
 };
 
 type MenuResult3d = Result<web::Json<Vec<Vec<(dinner::Model, Vec<extras::Model>)>>>, ServiceError>;
-// type MenuResult = Result<web::Json<Vec<(dinner::Model, Vec<extras::Model>)>>, ServiceError>;
-type MenuResult = Result<web::Json<(Vec<dinner::Model>, Vec<extras::Model>)>, ServiceError>;
+type MenuResult = Result<web::Json<MenuOneDay>, ServiceError>;
 
 async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
     let dinners = Dinner::find()
@@ -31,7 +31,7 @@ async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
         .map_err(map_db_err)?;
 
     let dinner_day_id = dinners[0].id;
-    let extras_for_day = Extras::find()
+    let extras = Extras::find()
         .from_raw_sql(
             Statement::from_string(DbBackend::MySql,
                 format!(r#"select e.* from extras e join extras_dinner ed on ed.extras_id=e.id where ed.dinner_id = {};"#,dinner_day_id)))
@@ -49,11 +49,15 @@ async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
     .map(|(dinner, extras)| (dinner.clone(), mem::take(extras)))
     .collect::<Vec<_>>(); */
 
-    Ok(web::Json((dinners, extras_for_day)))
+    Ok(web::Json(MenuOneDay { dinners, extras }))
 }
 
 async fn get_menu_3d(conn: &DatabaseConnection) -> MenuResult3d {
-    let mut dinners = Dinner::find().all(conn).await.map_err(map_db_err)?;
+    let mut dinners = Dinner::find()
+        .order_by_asc(dinner::Column::WeekDay)
+        .all(conn)
+        .await
+        .map_err(map_db_err)?;
 
     let mut extras = dinners
         .load_many_to_many(Extras, ExtrasDinner, conn)
