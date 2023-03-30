@@ -23,7 +23,7 @@ pub enum Relation {
     Extras,
     #[sea_orm(
         belongs_to = "super::user_dinner_orders::Entity",
-        from = "Column::Id",
+        from = "Column::UserDinnerId",
         to = "super::user_dinner_orders::Column::Id",
         on_update = "Restrict",
         on_delete = "Restrict"
