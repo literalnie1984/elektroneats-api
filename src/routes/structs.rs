@@ -37,6 +37,12 @@ pub struct MenuOneDay {
     pub extras: Vec<extras::Model>,
 }
 
+#[derive(Serialize)]
+pub struct DinnerWithExtras {
+    pub dinner: dinner::Model,
+    pub extras: Vec<extras::Model>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dinner {
