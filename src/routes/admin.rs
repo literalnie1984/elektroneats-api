@@ -1,5 +1,8 @@
-use actix_web::{put, web};
-use entity::{dinner, prelude::Dinner};
+use actix_web::{get, put, web};
+use entity::{
+    dinner, dinner_orders,
+    prelude::{Dinner, DinnerOrders},
+};
 use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set};
 use std::mem;
 
@@ -49,6 +52,42 @@ async fn update_dish(
         selected_dish.week_day = Set(week_day as u8);
     }
     selected_dish.update(conn).await.map_err(map_db_err)?;
+
+    Ok("Success".into())
+}
+
+#[get("/claim/{id}")]
+async fn claim_order(
+    user: AuthUser,
+    path: web::Path<i32>,
+    data: web::Data<AppState>,
+) -> Result<String, ServiceError> {
+    if !user.is_admin {
+        return Err(ServiceError::Unauthorized(
+            "You need to be an admin to access this".into(),
+        ));
+    }
+
+    let conn = &data.conn;
+    let claim_id = path.into_inner();
+
+    let mut order: dinner_orders::ActiveModel = {
+        let order = DinnerOrders::find_by_id(claim_id)
+            .one(conn)
+            .await
+            .map_err(map_db_err)?;
+        let Some(order) = order else {return Err(ServiceError::InternalError)};
+        if order.completed == 1 {
+            return Err(ServiceError::BadRequest(
+                "This order has already been claimed".into(),
+            ));
+        }
+        order.into()
+    };
+
+    //MySQL has no bools
+    order.completed = Set(1);
+    order.update(conn).await.map_err(map_db_err)?;
 
     Ok("Success".into())
 }

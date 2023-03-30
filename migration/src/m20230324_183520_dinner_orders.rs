@@ -31,6 +31,13 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(DinnerOrders::Completed).boolean().not_null())
+                    /* .col(
+                        ColumnDef::new(DinnerOrders::CollectionCode)
+                            .integer()
+                            .unique_key()
+                            .not_null()
+                            .auto_increment(),
+                    ) */
                     .to_owned(),
             )
             .await
@@ -50,4 +57,5 @@ enum DinnerOrders {
     UserId,
     CollectionDate,
     Completed,
+    // CollectionCode,
 }

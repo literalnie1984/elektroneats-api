@@ -1,6 +1,6 @@
 use actix_web::http::header;
 use async_std::sync::RwLock;
-use kantyna_api::routes::admin::update_dish;
+use kantyna_api::routes::admin::{claim_order, update_dish};
 use kantyna_api::routes::order::{
     create_order, get_completed_user_orders, get_pending_user_orders,
 };
@@ -55,7 +55,11 @@ async fn main() -> std::io::Result<()> {
                     .service(get_delete_mail)
                     .service(delete_acc),
             )
-            .service(web::scope("/admin").service(update_dish))
+            .service(
+                web::scope("/admin")
+                    .service(update_dish)
+                    .service(claim_order),
+            )
             .service(
                 web::scope("/orders")
                     .service(create_order)
