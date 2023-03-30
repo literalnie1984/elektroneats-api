@@ -43,6 +43,16 @@ pub struct DinnerWithExtras {
     pub extras: Vec<extras::Model>,
 }
 
+#[derive(Serialize, Deserialize, Default)]
+pub struct UpdateMenu {
+    pub id: i32,
+    pub name: Option<String>,
+    pub price: Option<f32>,
+    pub image: Option<String>,
+    pub max_supply: Option<i32>,
+    pub week_day: Option<entity::model_enums::Weekday>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dinner {

@@ -1,6 +1,9 @@
 use actix_web::http::header;
 use async_std::sync::RwLock;
-use kantyna_api::routes::order::{create_order, get_pending_user_orders, get_completed_user_orders};
+use kantyna_api::routes::admin::update_dish;
+use kantyna_api::routes::order::{
+    create_order, get_completed_user_orders, get_pending_user_orders,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -15,11 +18,11 @@ use kantyna_api::appstate::AppState;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    if cfg!(debug_assertions) {
+    /* if cfg!(debug_assertions) {
         std::env::set_var("RUST_LOG", "info");
         std::env::set_var("RUST_BACKTRACE", "1");
         env_logger::init();
-    }
+    } */
 
     dotenvy::dotenv().expect(".env file not found");
     let db_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
@@ -52,12 +55,12 @@ async fn main() -> std::io::Result<()> {
                     .service(get_delete_mail)
                     .service(delete_acc),
             )
+            .service(web::scope("/admin").service(update_dish))
             .service(
                 web::scope("/orders")
                     .service(create_order)
                     .service(get_completed_user_orders)
                     .service(get_pending_user_orders),
-
             )
             .service(
                 web::scope("/menu")

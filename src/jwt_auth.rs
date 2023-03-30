@@ -40,7 +40,7 @@ impl FromRequest for AuthUser {
             Ok(l) => l,
             Err(_) => {
                 return return_func(ServiceError::BadRequest(
-                    "Ivalid authorization header".to_string(),
+                    "Invalid authorization header".to_string(),
                 ))
             }
         };
@@ -49,7 +49,7 @@ impl FromRequest for AuthUser {
             Some(l) => l,
             None => {
                 return return_func(ServiceError::BadRequest(
-                    "Ivalid authorization header".to_string(),
+                    "Invalid authorization header".to_string(),
                 ))
             }
         };
