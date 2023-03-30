@@ -3,10 +3,13 @@ use entity::{
     dinner, dinner_orders,
     prelude::{Dinner, DinnerOrders},
 };
+use log::error;
 use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set};
 use std::mem;
 
-use crate::{appstate::AppState, errors::ServiceError, jwt_auth::AuthUser, map_db_err};
+use crate::{
+    appstate::AppState, errors::ServiceError, jwt_auth::AuthUser, map_db_err, update_if_some,
+};
 
 use super::structs::UpdateMenu;
 
@@ -35,18 +38,12 @@ async fn update_dish(
         selected_dish.into()
     };
 
-    //TODO: write macro for this
-    if let Some(name) = new_dish.name {
-        selected_dish.name = Set(name);
-    }
+    //TODO: write better macro for this
+    update_if_some!(selected_dish.name, new_dish.name);
+    update_if_some!(selected_dish.image, new_dish.image);
+    update_if_some!(selected_dish.max_supply, new_dish.max_supply);
     if let Some(price) = new_dish.price {
         selected_dish.price = Set(Decimal::from_f32_retain(price).unwrap());
-    }
-    if let Some(image) = new_dish.image {
-        selected_dish.image = Set(image);
-    }
-    if let Some(max_supply) = new_dish.max_supply {
-        selected_dish.max_supply = Set(max_supply);
     }
     if let Some(week_day) = new_dish.week_day {
         selected_dish.week_day = Set(week_day as u8);
@@ -76,7 +73,7 @@ async fn claim_order(
             .one(conn)
             .await
             .map_err(map_db_err)?;
-        let Some(order) = order else {return Err(ServiceError::InternalError)};
+        let Some(order) = order else {return Err(ServiceError::BadRequest("Invalid dinner_order id".into()))};
         if order.completed == 1 {
             return Err(ServiceError::BadRequest(
                 "This order has already been claimed".into(),

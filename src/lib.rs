@@ -25,3 +25,12 @@ where
 {
     convert_err_to_500(err, Some("Database error"))
 }
+
+#[macro_export]
+macro_rules! update_if_some {
+    ($db: expr, $new: expr) => {
+        if let Some(new) = $new {
+            $db = Set(new);
+        }
+    };
+}
