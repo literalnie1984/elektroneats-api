@@ -82,12 +82,12 @@ pub struct OrderRequest {
     #[serde(with = "ts_seconds")]
     pub collection_date: DateTime<Utc>,
 }
-
+//DinnerResponse
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DinnerResponse {
-    pub dinner: dinner::Model,
-    pub extras: Vec<extras::Model>,
+    pub dinner_id: i32,
+    pub extras_ids: Vec<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -105,31 +105,16 @@ pub struct UserWithOrders{
     pub orders: Vec<OrderResponse>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DinnerResponseCool {
-    pub dinner_id: i32,
-    pub extras_ids: Vec<i32>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OrderResponseCool {
-    #[serde(with = "ts_seconds")]
-    pub collection_date: DateTime<Utc>,
-    pub dinners: Vec<DinnerResponseCool>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct UserWithOrdersCool{
-    pub user_id: i32,
-    pub username: String,
-    pub orders: Vec<OrderResponseCool>,
+#[derive(Serialize)]
+pub struct AllUsersOrders{
+    pub response: Vec<UserWithOrders>,
+    pub dinners: HashSet<dinner::Model>,
+    pub extras: HashSet<extras::Model>,
 }
 
 #[derive(Serialize)]
-pub struct VeryCool{
-    pub response: Vec<UserWithOrdersCool>,
+pub struct UserOrders{
+    pub response: Vec<OrderResponse>,
     pub dinners: HashSet<dinner::Model>,
     pub extras: HashSet<extras::Model>,
 }
