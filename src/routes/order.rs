@@ -135,14 +135,17 @@ async fn get_pending_user_orders(
     get_user_orders(user_id, db, 0).await
 }
 
-//TODO: ADD ADMIN RESTRICTION
 //TODO: FIX RESPONSE REDUNDANCY
 #[get("/all-pending-orders")]
-async fn get_all_orders(data: web::Data<AppState>) -> Result<web::Json<Vec<UserWithOrders>>, ServiceError>{
+async fn get_all_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<Vec<UserWithOrders>>, ServiceError>{
+    if !user.is_admin{
+        return Err(ServiceError::Unauthorized("Only admin can access that data".to_string()));
+    }
     let db = &data.conn;
 
     let users_with_orders = user::Entity::find()
         .find_with_related(dinner_orders::Entity)
+        .filter(dinner_orders::Column::Completed.eq(0))
         .all(db)
         .await
         .map_err(map_db_err)?;

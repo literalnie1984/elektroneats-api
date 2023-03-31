@@ -21,12 +21,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(User::Email).string().unique_key().not_null())
                     .col(ColumnDef::new(User::Username).string().not_null())
                     .col(ColumnDef::new(User::Password).string().not_null())
-                    .col(
-                        ColumnDef::new(User::Balance)
-                            .decimal_len(6, 2)
-                            .not_null()
-                            .default(0.0),
-                    )
+                    // .col(
+                    //     ColumnDef::new(User::Balance)
+                    //         .decimal_len(6, 2)
+                    //         .not_null()
+                    //         .default(0.0),
+                    // )
                     .col(
                         ColumnDef::new(User::Verified)
                             .boolean()
@@ -85,7 +85,6 @@ enum User {
     Username,
     Email,
     Password,
-    Balance,
     Verified,
 }
 
