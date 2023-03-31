@@ -1,17 +1,12 @@
 use actix_web::http::header;
 use async_std::sync::RwLock;
-use kantyna_api::routes::admin::{claim_order, update_dish};
-use kantyna_api::routes::order::{
-    create_order, get_completed_user_orders, get_pending_user_orders, get_all_orders,
-};
+use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
-use kantyna_api::routes::menu::*;
-use kantyna_api::routes::users::*;
 use migration::{Migrator, MigratorTrait};
 
 use kantyna_api::appstate::AppState;
@@ -53,13 +48,19 @@ async fn main() -> std::io::Result<()> {
                     .service(get_user_data)
                     .service(change_password)
                     .service(get_delete_mail)
-                    .service(add_balance)
                     .service(delete_acc),
             )
             .service(
                 web::scope("/admin")
                     .service(update_dish)
                     .service(claim_order),
+            )
+            .service(
+                web::scope("payment")
+                    .service(add_balance)
+                    .service(init_wallet)
+                    .service(check_balance)
+                    .service(pay),
             )
             .service(
                 web::scope("/orders")

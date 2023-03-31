@@ -3,7 +3,6 @@ use std::mem;
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
-use stripe::{CreateCustomer, Customer};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
 use nanoid::nanoid;
@@ -15,7 +14,7 @@ use crate::appstate::AppState;
 use crate::enums::VerificationType;
 use crate::routes::structs::UserJson;
 use crate::routes::structs::{RefreshTokenRequest, TokenGenResponse};
-use crate::{convert_err_to_500, get_or_create_customer, map_db_err, send_verification_mail};
+use crate::{convert_err_to_500, map_db_err, send_verification_mail};
 
 use crate::errors::ServiceError;
 use crate::jwt_auth::AuthUser;
@@ -254,19 +253,4 @@ async fn activate_account(
     user.update(conn).await.map_err(map_db_err)?;
 
     Ok("account verified successfully".to_string())
-}
-
-#[post("/add_balance/{amount}")]
-async fn add_balance(
-    user: AuthUser,
-    data: web::Data<AppState>,
-    amount: web::Path<u32>,
-) -> Result<impl Responder, ServiceError> {
-    let amount = amount.into_inner();
-    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
-    let client = stripe::Client::new(secret_key);
-    let conn = &data.conn;
-
-    let customer = get_or_create_customer(conn, user.id, &client).await?;
-    Ok(web::Json(customer))
 }

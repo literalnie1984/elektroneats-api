@@ -1,6 +1,4 @@
 use appstate::ActivatorsVec;
-use entity::prelude::User;
-use entity::user;
 use enums::VerificationType;
 use lettre::{
     transport::smtp::{
@@ -12,9 +10,7 @@ use lettre::{
 use log::error;
 use migration::DbErr;
 use nanoid::nanoid;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
-use std::{fmt::Display, str::FromStr};
-use stripe::{self, CreateCustomer, Customer, CustomerId};
+use std::fmt::Display;
 
 use errors::ServiceError;
 
@@ -81,41 +77,5 @@ pub async fn send_verification_mail(
     match smtp.send(mail).await {
         Err(_) => Err(ServiceError::InternalError),
         Ok(_) => Ok("email send".to_string()),
-    }
-}
-
-pub async fn get_or_create_customer(
-    conn: &DatabaseConnection,
-    user_id: i32,
-    client: &stripe::Client,
-) -> Result<Customer, ServiceError> {
-    let user = User::find_by_id(user_id)
-        .one(conn)
-        .await
-        .map_err(map_db_err)?;
-    let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
-    if let Some(user_id) = user.stripe_id {
-        eprintln!("retrieving");
-        let id: CustomerId = CustomerId::from_str(&user_id).unwrap();
-        let customer = Customer::retrieve(client, &id, &[])
-            .await
-            .map_err(|e| convert_err_to_500(e, Some("Stripe err")))?;
-        Ok(customer)
-    } else {
-        let customer = Customer::create(
-            &client,
-            CreateCustomer {
-                name: Some(&user.username),
-                email: Some(&user.email),
-                ..Default::default()
-            },
-        )
-        .await
-        .map_err(|e| convert_err_to_500(e, Some("Stripe error")))?;
-
-        let mut user_upd: user::ActiveModel = user.into();
-        user_upd.stripe_id = Set(Some(customer.id.to_string()));
-        user_upd.update(conn).await.map_err(map_db_err)?;
-        Ok(customer)
     }
 }
