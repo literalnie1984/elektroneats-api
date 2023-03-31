@@ -28,7 +28,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(0),
                     ) */
-                    .col(ColumnDef::new(User::StripeId).string().unique_key())
+                    .col(ColumnDef::new(User::StripeId).string())
                     .col(
                         ColumnDef::new(User::Verified)
                             .boolean()

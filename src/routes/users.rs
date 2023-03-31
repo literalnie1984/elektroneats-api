@@ -14,12 +14,12 @@ use entity::user;
 use crate::appstate::AppState;
 use crate::enums::VerificationType;
 use crate::routes::structs::UserJson;
-use crate::{map_db_err, send_verification_mail,convert_err_to_500};
-use crate::routes::structs::{TokenGenResponse, RefreshTokenRequest};
+use crate::routes::structs::{RefreshTokenRequest, TokenGenResponse};
+use crate::{convert_err_to_500, get_or_create_customer, map_db_err, send_verification_mail};
 
 use crate::errors::ServiceError;
-use crate::jwt_auth::{decode_refresh_token, encode_jwt, AccessTokenClaims, RefreshTokenClaims};
 use crate::jwt_auth::AuthUser;
+use crate::jwt_auth::{decode_refresh_token, encode_jwt, AccessTokenClaims, RefreshTokenClaims};
 use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
 use log::error;
@@ -125,9 +125,9 @@ async fn delete_acc(
 
 #[post("/refresh-token")]
 async fn refresh_token(
-    mut refresh_token: web::Json<RefreshTokenRequest>, 
-    data: web::Data<AppState>
-) -> Result<web::Json<TokenGenResponse>, ServiceError>{
+    mut refresh_token: web::Json<RefreshTokenRequest>,
+    data: web::Data<AppState>,
+) -> Result<web::Json<TokenGenResponse>, ServiceError> {
     let conn = &data.conn;
     let uid = decode_refresh_token(&refresh_token.refresh_token)?;
 
@@ -139,12 +139,17 @@ async fn refresh_token(
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
     let new_access_token = encode_jwt(&AccessTokenClaims::new(
-        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
-    )).map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
+        user_query.id,
+        &user_query.username,
+        &user_query.email,
+        user_query.admin,
+        60 * 10,
+    ))
+    .map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
 
-    Ok(web::Json(TokenGenResponse{ 
-        access_token: new_access_token, 
-        refresh_token: mem::take(&mut refresh_token.refresh_token)
+    Ok(web::Json(TokenGenResponse {
+        access_token: new_access_token,
+        refresh_token: mem::take(&mut refresh_token.refresh_token),
     }))
 }
 
@@ -164,21 +169,28 @@ async fn login(
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
     let result = verify(&user.password, &user_query.password).unwrap();
 
-    if !result{
+    if !result {
         return Err(ServiceError::Unauthorized(
             "Invalid credentials".to_string(),
         ));
     }
 
     let access_token = encode_jwt(&AccessTokenClaims::new(
-        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
+        user_query.id,
+        &user_query.username,
+        &user_query.email,
+        user_query.admin,
+        60 * 10,
     ))
     .map_err(|err| convert_err_to_500(err, Some("Error creating access token")))?;
 
-    let ref_token = encode_jwt(&RefreshTokenClaims::new(user_query.id, 60*60*24))
-    .map_err(|err| convert_err_to_500(err, Some("Error creating refresh token")))?;
+    let ref_token = encode_jwt(&RefreshTokenClaims::new(user_query.id, 60 * 60 * 24))
+        .map_err(|err| convert_err_to_500(err, Some("Error creating refresh token")))?;
 
-    Ok(web::Json(TokenGenResponse{access_token, refresh_token: ref_token}))
+    Ok(web::Json(TokenGenResponse {
+        access_token,
+        refresh_token: ref_token,
+    }))
 }
 
 #[post("/register")]
@@ -249,22 +261,12 @@ async fn add_balance(
     user: AuthUser,
     data: web::Data<AppState>,
     amount: web::Path<u32>,
-) -> Result<String, ServiceError> {
+) -> Result<impl Responder, ServiceError> {
     let amount = amount.into_inner();
     let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
     let client = stripe::Client::new(secret_key);
-    let email = "test@gmail.com";
-    let username = "temp";
+    let conn = &data.conn;
 
-    Customer::retrieve(client, id, expand)
-    let customer = Customer::create(
-        &client,
-        CreateCustomer {
-            name: Some(username),
-            email: Some(email),
-            ..Default::default()
-        },
-    );
-
-    Ok("TODO".into())
+    let customer = get_or_create_customer(conn, user.id, &client).await?;
+    Ok(web::Json(customer))
 }

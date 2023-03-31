@@ -14,8 +14,7 @@ pub struct Model {
     pub password: String,
     pub verified: i8,
     pub admin: i8,
-    #[sea_orm(unique)]
-    pub stripe_id: String,
+    pub stripe_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
