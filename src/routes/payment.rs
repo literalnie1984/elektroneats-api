@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use actix_web::{get, post, web, Responder};
+use actix_web::{get, post, web};
 use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
