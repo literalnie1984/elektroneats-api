@@ -2,7 +2,6 @@ use std::{mem::take, vec};
 
 use actix_web::web;
 use entity::{dinner, extras, extras_dinner};
-use log::error;
 use scraper::{Html, Selector};
 use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;

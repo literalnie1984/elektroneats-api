@@ -112,9 +112,7 @@ enum DinnerOrders {
 #[derive(Iden)]
 enum ExtrasOrder {
     Table,
-    Id,
     UserDinnerId,
-    ExtrasId,
 }
 
 #[derive(Iden)]
@@ -133,5 +131,4 @@ enum Dinner {
 enum UserDinnerOrders {
     Table,
     Id,
-    DinnerId,
 }

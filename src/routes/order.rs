@@ -1,7 +1,7 @@
 use std::mem;
 
 use actix_web::{get, post, web};
-use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders};
+use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set};
 
 use crate::{
@@ -9,10 +9,10 @@ use crate::{
     convert_err_to_500,
     errors::ServiceError,
     jwt_auth::AuthUser,
-    routes::structs::{DinnerResponse, OrderRequest},
+    routes::structs::{DinnerResponse, OrderRequest}, map_db_err,
 };
 
-use super::structs::OrderResponse;
+use super::structs::{OrderResponse, UserWithOrders};
 
 #[post("/create")]
 async fn create_order(
@@ -133,4 +133,54 @@ async fn get_pending_user_orders(
     let user_id = user.id;
 
     get_user_orders(user_id, db, 0).await
+}
+
+//TODO: FIX RESPONSE REDUNDANCY
+#[get("/all-pending-orders")]
+async fn get_all_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<Vec<UserWithOrders>>, ServiceError>{
+    if !user.is_admin{
+        return Err(ServiceError::Unauthorized("Only admin can access that data".to_string()));
+    }
+    let db = &data.conn;
+
+    let users_with_orders = user::Entity::find()
+        .find_with_related(dinner_orders::Entity)
+        .filter(dinner_orders::Column::Completed.eq(0))
+        .all(db)
+        .await
+        .map_err(map_db_err)?;
+
+    let mut output: Vec<UserWithOrders> = Vec::with_capacity(users_with_orders.len());
+
+    for (user, orders) in users_with_orders.iter(){
+        output.push(
+            UserWithOrders{
+                username: user.username.clone(),
+                user_id: user.id,
+                orders: Vec::new(),
+            }
+        );
+
+        let user_dinner_orders = orders.load_many(user_dinner_orders::Entity, db).await.map_err(map_db_err)?;
+
+        for (user_dinner, order) in user_dinner_orders.iter().zip(orders.iter()) {
+
+            let dinner = user_dinner.load_one(dinner::Entity, db).await.map_err(map_db_err)?;
+            let extras = user_dinner.load_many_to_many(extras::Entity, extras_order::Entity, db).await.map_err(map_db_err)?;
+
+            let mut dinners_with_extras = dinner.into_iter().zip(extras.into_iter()).map(|(dinner, extras)| {
+                DinnerResponse{dinner: dinner.unwrap(), extras: extras}
+            }).collect::<Vec<_>>();
+
+            output.last_mut().unwrap().orders.push(
+                OrderResponse {
+                    collection_date: order.collection_date,
+                    dinners: mem::take(&mut dinners_with_extras),
+                }
+            );
+        }
+    }
+
+
+    Ok(web::Json(output))
 }

@@ -46,22 +46,6 @@ macro_rules! update_if_some {
     };
 }
 
-pub async fn get_user_balance(db: &DatabaseConnection, user_id: i32) -> Result<f32, ServiceError> {
-    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
-    let client = stripe::Client::new(secret_key);
-
-    let user = User::find_by_id(user_id)
-        .one(db)
-        .await
-        .map_err(map_db_err)?;
-    let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
-    if let Some(user_id) = user.stripe_id {
-        stripe::Client::retrieve();
-    }
-
-    Ok(user.balance.try_into().unwrap())
-}
-
 pub async fn send_verification_mail(
     email: &str,
     activators: &ActivatorsVec,
@@ -97,4 +81,20 @@ pub async fn send_verification_mail(
         Err(_) => Err(ServiceError::InternalError),
         Ok(_) => Ok("email send".to_string()),
     }
+}
+
+pub async fn get_user_balance(db: &DatabaseConnection, user_id: i32) -> Result<f32, ServiceError> {
+    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
+    let client = stripe::Client::new(secret_key);
+
+    let user = User::find_by_id(user_id)
+        .one(db)
+        .await
+        .map_err(map_db_err)?;
+    let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
+    if let Some(user_id) = user.stripe_id {
+        stripe::Client::retrieve();
+    }
+
+    Ok(user.balance.try_into().unwrap())
 }

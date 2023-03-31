@@ -1,3 +1,5 @@
+use std::mem;
+
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
@@ -12,10 +14,11 @@ use entity::user;
 use crate::appstate::AppState;
 use crate::enums::VerificationType;
 use crate::routes::structs::UserJson;
-use crate::{map_db_err, send_verification_mail};
+use crate::{map_db_err, send_verification_mail,convert_err_to_500};
+use crate::routes::structs::{TokenGenResponse, RefreshTokenRequest};
 
 use crate::errors::ServiceError;
-use crate::jwt_auth::create_jwt;
+use crate::jwt_auth::{decode_refresh_token, encode_jwt, AccessTokenClaims, RefreshTokenClaims};
 use crate::jwt_auth::AuthUser;
 use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
@@ -59,21 +62,21 @@ async fn change_password(
 }
 
 #[get("/get-user-data")]
-async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
-    let conn = &data.conn;
+async fn get_user_data(user: AuthUser) -> impl Responder {
+    // let conn = &data.conn;
 
-    let user_query = User::find()
-        .filter(user::Column::Id.eq(user.id))
-        .one(conn)
-        .await
-        .map_err(map_db_err)?;
+    // let user_query = User::find()
+    //     .filter(user::Column::Id.eq(user.id))
+    //     .one(conn)
+    //     .await
+    //     .map_err(map_db_err)?;
 
-    let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+    // let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
-    Ok(web::Json(UserJson {
+    web::Json(UserJson {
         username: user.username,
-        admin: user.admin != 0,
-    }))
+        admin: user.is_admin,
+    })
 }
 
 #[get("/delete")]
@@ -120,11 +123,36 @@ async fn delete_acc(
     }
 }
 
+#[post("/refresh-token")]
+async fn refresh_token(
+    mut refresh_token: web::Json<RefreshTokenRequest>, 
+    data: web::Data<AppState>
+) -> Result<web::Json<TokenGenResponse>, ServiceError>{
+    let conn = &data.conn;
+    let uid = decode_refresh_token(&refresh_token.refresh_token)?;
+
+    let user_query = User::find()
+        .filter(user::Column::Id.eq(uid))
+        .one(conn)
+        .await
+        .map_err(map_db_err)?;
+    let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+
+    let new_access_token = encode_jwt(&AccessTokenClaims::new(
+        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
+    )).map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
+
+    Ok(web::Json(TokenGenResponse{ 
+        access_token: new_access_token, 
+        refresh_token: mem::take(&mut refresh_token.refresh_token)
+    }))
+}
+
 #[post("/login")]
 async fn login(
     user: web::Json<UserLogin>,
     data: web::Data<AppState>,
-) -> Result<String, ServiceError> {
+) -> Result<web::Json<TokenGenResponse>, ServiceError> {
     let conn = &data.conn;
     let user = user.into_inner();
     let user_query = User::find()
@@ -136,21 +164,21 @@ async fn login(
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
     let result = verify(&user.password, &user_query.password).unwrap();
 
-    if result {
-        let token = match create_jwt(user_query.id, user_query.admin) {
-            Ok(token) => token,
-            Err(error) => {
-                eprintln!("Error creating token: {}", error);
-                return Err(ServiceError::InternalError);
-            }
-        };
-
-        Ok(token)
-    } else {
-        Err(ServiceError::Unauthorized(
+    if !result{
+        return Err(ServiceError::Unauthorized(
             "Invalid credentials".to_string(),
-        ))
+        ));
     }
+
+    let access_token = encode_jwt(&AccessTokenClaims::new(
+        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
+    ))
+    .map_err(|err| convert_err_to_500(err, Some("Error creating access token")))?;
+
+    let ref_token = encode_jwt(&RefreshTokenClaims::new(user_query.id, 60*60*24))
+    .map_err(|err| convert_err_to_500(err, Some("Error creating refresh token")))?;
+
+    Ok(web::Json(TokenGenResponse{access_token, refresh_token: ref_token}))
 }
 
 #[post("/register")]
