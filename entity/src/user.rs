@@ -11,7 +11,8 @@ pub struct Model {
     pub email: String,
     pub username: String,
     pub password: String,
-    pub balance: i32,
+    #[sea_orm(column_type = "Decimal(Some((6, 2)))")]
+    pub balance: Decimal,
     pub verified: i8,
     pub admin: i8,
 }

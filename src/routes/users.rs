@@ -1,8 +1,5 @@
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
-use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-use lettre::transport::smtp::PoolConfig;
-use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -10,12 +7,11 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
-use serde::Serialize;
 
-use crate::appstate::{ActivatorsVec, AppState};
+use crate::appstate::AppState;
 use crate::enums::VerificationType;
 use crate::routes::structs::UserJson;
-use crate::{convert_err_to_500, map_db_err};
+use crate::{get_user_balance, map_db_err, send_verification_mail};
 
 use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
@@ -219,39 +215,12 @@ async fn activate_account(
     Ok("account verified successfully".to_string())
 }
 
-async fn send_verification_mail(
-    email: &str,
-    activators: &ActivatorsVec,
-    email_type: VerificationType,
+#[post("/add_balance/{amount}")]
+async fn add_balance(
+    user: AuthUser,
+    data: web::Data<AppState>,
+    amount: web::Path<u32>,
 ) -> Result<String, ServiceError> {
-    let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse().unwrap();
-    let to = email
-        .parse()
-        .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
-
-    //add email - activation_link combo to current app state
-    let activation_link = nanoid!();
-    let mail = email_type
-        .email_msg(to, from, &activation_link)
-        .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
-    let mut activators = activators.write().await;
-    (*activators).insert(activation_link, email.into());
-
-    let smtp: AsyncSmtpTransport<AsyncStd1Executor> =
-        AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay("mikut.dev")
-            .unwrap()
-            .credentials(Credentials::new(
-                "kantyna.noreply@mikut.dev".to_owned(),
-                dotenvy::var("EMAIL_PASS")
-                    .expect("NO EMAIL_PASS val provided in .env")
-                    .to_string(),
-            ))
-            .authentication(vec![Mechanism::Plain])
-            .pool_config(PoolConfig::new().max_size(20))
-            .build();
-
-    match smtp.send(mail).await {
-        Err(_) => Err(ServiceError::InternalError),
-        Ok(_) => Ok("email send".to_string()),
-    }
+    let balance = get_user_balance(&data.conn, user.id).await?;
+    Ok(format!("{}", balance))
 }

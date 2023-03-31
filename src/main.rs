@@ -53,6 +53,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_user_data)
                     .service(change_password)
                     .service(get_delete_mail)
+                    .service(add_balance)
                     .service(delete_acc),
             )
             .service(
