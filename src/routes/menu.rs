@@ -6,10 +6,8 @@ use entity::{
     dinner, extras,
     prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras,
 };
-use log::error;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
-    Statement,
+    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
 };
 use sea_orm::ModelTrait;
 

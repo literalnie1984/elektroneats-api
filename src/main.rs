@@ -2,7 +2,7 @@ use actix_web::http::header;
 use async_std::sync::RwLock;
 use kantyna_api::routes::admin::{claim_order, update_dish};
 use kantyna_api::routes::order::{
-    create_order, get_completed_user_orders, get_pending_user_orders,
+    create_order, get_completed_user_orders, get_pending_user_orders, get_all_orders,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -64,6 +64,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/orders")
                     .service(create_order)
                     .service(get_completed_user_orders)
+                    .service(get_all_orders)
                     .service(get_pending_user_orders),
             )
             .service(
