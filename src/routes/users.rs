@@ -1,6 +1,7 @@
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
+use stripe::{CreateCustomer, Customer};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
 use nanoid::nanoid;
@@ -11,7 +12,7 @@ use entity::user;
 use crate::appstate::AppState;
 use crate::enums::VerificationType;
 use crate::routes::structs::UserJson;
-use crate::{get_user_balance, map_db_err, send_verification_mail};
+use crate::{map_db_err, send_verification_mail};
 
 use crate::errors::ServiceError;
 use crate::jwt_auth::create_jwt;
@@ -221,6 +222,21 @@ async fn add_balance(
     data: web::Data<AppState>,
     amount: web::Path<u32>,
 ) -> Result<String, ServiceError> {
-    let balance = get_user_balance(&data.conn, user.id).await?;
-    Ok(format!("{}", balance))
+    let amount = amount.into_inner();
+    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
+    let client = stripe::Client::new(secret_key);
+    let email = "test@gmail.com";
+    let username = "temp";
+
+    Customer::retrieve(client, id, expand)
+    let customer = Customer::create(
+        &client,
+        CreateCustomer {
+            name: Some(username),
+            email: Some(email),
+            ..Default::default()
+        },
+    );
+
+    Ok("TODO".into())
 }
