@@ -17,14 +17,36 @@ async fn add_balance() -> Result<String, ServiceError> {
     todo!()
 }
 
-#[get("/check_balance")]
-async fn check_balance() -> Result<String, ServiceError> {
-    todo!()
-}
-
 #[post("/pay/{amount:[0-9]+}")]
 async fn pay() -> Result<String, ServiceError> {
     todo!()
+}
+
+#[get("/details")]
+async fn get_customer(
+    user: AuthUser,
+    data: web::Data<AppState>,
+) -> Result<web::Json<Customer>, ServiceError> {
+    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
+    let client = Client::new(secret_key);
+
+    let conn = &data.conn;
+    let user = User::find_by_id(user.id)
+        .one(conn)
+        .await
+        .map_err(map_db_err)?;
+    let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
+    if let Some(user_id) = user.stripe_id {
+        let id: CustomerId = CustomerId::from_str(&user_id).unwrap();
+        let customer = Customer::retrieve(&client, &id, &[])
+            .await
+            .map_err(|e| convert_err_to_500(e, Some("Stripe err")))?;
+        Ok(web::Json(customer))
+    } else {
+        Err(ServiceError::BadRequest(
+            "Stripe wasn't initialized for provided user".into(),
+        ))
+    }
 }
 
 #[post("/init")]
@@ -41,7 +63,7 @@ pub async fn create_customer(
     conn: &DatabaseConnection,
     user_id: i32,
     mut stripe_data: StripeUser,
-) -> Result<Customer, ServiceError> {
+) -> Result<(), ServiceError> {
     let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
     let client = Client::new(secret_key);
 
@@ -81,41 +103,5 @@ pub async fn create_customer(
     let mut user_upd: user::ActiveModel = user.into();
     user_upd.stripe_id = Set(Some(customer.id.to_string()));
     user_upd.update(conn).await.map_err(map_db_err)?;
-    Ok(customer)
-}
-
-pub async fn get_or_create_customer(
-    conn: &DatabaseConnection,
-    user_id: i32,
-    client: &stripe::Client,
-) -> Result<Customer, ServiceError> {
-    let user = User::find_by_id(user_id)
-        .one(conn)
-        .await
-        .map_err(map_db_err)?;
-    let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
-    if let Some(user_id) = user.stripe_id {
-        eprintln!("retrieving");
-        let id: CustomerId = CustomerId::from_str(&user_id).unwrap();
-        let customer = Customer::retrieve(client, &id, &[])
-            .await
-            .map_err(|e| convert_err_to_500(e, Some("Stripe err")))?;
-        Ok(customer)
-    } else {
-        let customer = Customer::create(
-            &client,
-            CreateCustomer {
-                name: Some(&user.username),
-                email: Some(&user.email),
-                ..Default::default()
-            },
-        )
-        .await
-        .map_err(|e| convert_err_to_500(e, Some("Stripe error")))?;
-
-        let mut user_upd: user::ActiveModel = user.into();
-        user_upd.stripe_id = Set(Some(customer.id.to_string()));
-        user_upd.update(conn).await.map_err(map_db_err)?;
-        Ok(customer)
-    }
+    Ok(())
 }
