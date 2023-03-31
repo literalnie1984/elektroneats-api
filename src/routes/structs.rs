@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
 use entity::{dinner, extras};
@@ -101,4 +103,33 @@ pub struct UserWithOrders{
     pub user_id: i32,
     pub username: String,
     pub orders: Vec<OrderResponse>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DinnerResponseCool {
+    pub dinner_id: i32,
+    pub extras_ids: Vec<i32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderResponseCool {
+    #[serde(with = "ts_seconds")]
+    pub collection_date: DateTime<Utc>,
+    pub dinners: Vec<DinnerResponseCool>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserWithOrdersCool{
+    pub user_id: i32,
+    pub username: String,
+    pub orders: Vec<OrderResponseCool>,
+}
+
+#[derive(Serialize)]
+pub struct VeryCool{
+    pub response: Vec<UserWithOrdersCool>,
+    pub dinners: HashSet<dinner::Model>,
+    pub extras: HashSet<extras::Model>,
 }

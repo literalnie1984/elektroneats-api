@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::sea_orm_active_enums::ExtrasType;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Hash)]
 #[sea_orm(table_name = "extras")]
 pub struct Model {
     #[sea_orm(primary_key)]
