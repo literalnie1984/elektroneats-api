@@ -3,7 +3,6 @@ use entity::{
     dinner, dinner_orders,
     prelude::{Dinner, DinnerOrders},
 };
-use log::error;
 use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set};
 use std::mem;
 

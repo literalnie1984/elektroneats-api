@@ -3,7 +3,7 @@ use std::mem;
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
 use entity::{
-    dinner, extras,
+    dinner,
     prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras,
 };
 use sea_orm::{

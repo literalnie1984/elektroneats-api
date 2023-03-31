@@ -1,4 +1,4 @@
-use sea_orm_migration::{prelude::*, prelude::ColumnType::Decimal};
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

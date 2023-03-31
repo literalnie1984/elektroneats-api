@@ -5,7 +5,6 @@ use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport};
-use sea_orm::prelude::Decimal;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -13,7 +12,6 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
-use serde::Serialize;
 
 use crate::appstate::{ActivatorsVec, AppState};
 use crate::enums::VerificationType;
