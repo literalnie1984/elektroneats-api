@@ -21,7 +21,7 @@ use crate::routes::structs::{UserJson, TokenGenResponse, RefreshTokenRequest};
 use crate::{convert_err_to_500, map_db_err};
 
 use crate::errors::ServiceError;
-use crate::jwt_auth::{encode_access_token, encode_refresh_token, decode_refresh_token};
+use crate::jwt_auth::{decode_refresh_token, encode_jwt, AccessTokenClaims, RefreshTokenClaims};
 use crate::jwt_auth::AuthUser;
 use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
@@ -141,12 +141,9 @@ async fn refresh_token(
         .map_err(map_db_err)?;
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
-    let new_access_token = encode_access_token(
-        user_query.id, user_query.admin, &user_query.username, &user_query.email
-    ).map_err(|err|{
-        error!("Error: {}", err);
-        ServiceError::InternalError
-    })?;
+    let new_access_token = encode_jwt(&AccessTokenClaims::new(
+        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
+    )).map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
 
     Ok(web::Json(TokenGenResponse{ 
         access_token: new_access_token, 
@@ -176,25 +173,13 @@ async fn login(
         ));
     }
 
-    let access_token = match encode_access_token(
-        user_query.id, user_query.admin, &user_query.username, &user_query.email
-    ) {
-        Ok(token) => token,
-        Err(error) => {
-            eprintln!("Error creating token: {}", error);
-            return Err(ServiceError::InternalError);
-        }
-    };
+    let access_token = encode_jwt(&AccessTokenClaims::new(
+        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
+    ))
+    .map_err(|err| convert_err_to_500(err, Some("Error creating access token")))?;
 
-    let ref_token = match encode_refresh_token(
-        user_query.id
-    ) {
-        Ok(token) => token,
-        Err(error) => {
-            eprintln!("Error creating token: {}", error);
-            return Err(ServiceError::InternalError);
-        }
-    };
+    let ref_token = encode_jwt(&RefreshTokenClaims::new(user_query.id, 60*60*24))
+    .map_err(|err| convert_err_to_500(err, Some("Error creating refresh token")))?;
 
     Ok(web::Json(TokenGenResponse{access_token, refresh_token: ref_token}))
 }
