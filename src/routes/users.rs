@@ -2,9 +2,6 @@ use std::mem;
 
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
-use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-use lettre::transport::smtp::PoolConfig;
-use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -12,15 +9,16 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
+use serde::Deserialize;
 
-use crate::appstate::{ActivatorsVec, AppState};
+use crate::appstate::AppState;
 use crate::enums::VerificationType;
-use crate::routes::structs::{UserJson, TokenGenResponse, RefreshTokenRequest};
-use crate::{convert_err_to_500, map_db_err};
+use crate::routes::structs::{RefreshTokenRequest, TokenGenResponse, UserJson};
+use crate::{convert_err_to_500, map_db_err, send_verification_mail};
 
 use crate::errors::ServiceError;
-use crate::jwt_auth::{decode_refresh_token, encode_jwt, AccessTokenClaims, RefreshTokenClaims};
 use crate::jwt_auth::AuthUser;
+use crate::jwt_auth::{decode_refresh_token, encode_jwt, AccessTokenClaims, RefreshTokenClaims};
 use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
 use log::error;
@@ -98,17 +96,23 @@ async fn get_delete_mail(
     send_verification_mail(&user.email, &data.activators_del, VerificationType::Delete).await
 }
 
-#[get("/delete/{token}")]
+#[post("/delete/{token}")]
 async fn delete_acc(
-    _user: AuthUser,
+    user: AuthUser,
     data: web::Data<AppState>,
     token: Path<String>,
 ) -> Result<impl Responder, ServiceError> {
     let tokens = data.activators_del.read().await;
-    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
+    let token = &token.into_inner();
+    let Some(token2) = tokens.get(&user.email) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
+
+    if token != token2 {
+        return Err(ServiceError::BadRequest("Invalid deletion code!".into()));
+    }
+
     let conn = &data.conn;
     let user_query: Option<user::Model> = User::find()
-        .filter(user::Column::Email.eq(email))
+        .filter(user::Column::Email.eq(user.email))
         .one(conn)
         .await
         .map_err(map_db_err)?;
@@ -126,9 +130,9 @@ async fn delete_acc(
 
 #[post("/refresh-token")]
 async fn refresh_token(
-    mut refresh_token: web::Json<RefreshTokenRequest>, 
-    data: web::Data<AppState>
-) -> Result<web::Json<TokenGenResponse>, ServiceError>{
+    mut refresh_token: web::Json<RefreshTokenRequest>,
+    data: web::Data<AppState>,
+) -> Result<web::Json<TokenGenResponse>, ServiceError> {
     let conn = &data.conn;
     let uid = decode_refresh_token(&refresh_token.refresh_token)?;
 
@@ -140,12 +144,17 @@ async fn refresh_token(
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
     let new_access_token = encode_jwt(&AccessTokenClaims::new(
-        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
-    )).map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
+        user_query.id,
+        &user_query.username,
+        &user_query.email,
+        user_query.admin,
+        60 * 10,
+    ))
+    .map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
 
-    Ok(web::Json(TokenGenResponse{ 
-        access_token: new_access_token, 
-        refresh_token: mem::take(&mut refresh_token.refresh_token)
+    Ok(web::Json(TokenGenResponse {
+        access_token: new_access_token,
+        refresh_token: mem::take(&mut refresh_token.refresh_token),
     }))
 }
 
@@ -165,21 +174,28 @@ async fn login(
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
     let result = verify(&user.password, &user_query.password).unwrap();
 
-    if !result{
+    if !result {
         return Err(ServiceError::Unauthorized(
             "Invalid credentials".to_string(),
         ));
     }
 
     let access_token = encode_jwt(&AccessTokenClaims::new(
-        user_query.id, &user_query.username, &user_query.email, user_query.admin, 60*10
+        user_query.id,
+        &user_query.username,
+        &user_query.email,
+        user_query.admin,
+        60 * 10,
     ))
     .map_err(|err| convert_err_to_500(err, Some("Error creating access token")))?;
 
-    let ref_token = encode_jwt(&RefreshTokenClaims::new(user_query.id, 60*60*24))
-    .map_err(|err| convert_err_to_500(err, Some("Error creating refresh token")))?;
+    let ref_token = encode_jwt(&RefreshTokenClaims::new(user_query.id, 60 * 60 * 24))
+        .map_err(|err| convert_err_to_500(err, Some("Error creating refresh token")))?;
 
-    Ok(web::Json(TokenGenResponse{access_token, refresh_token: ref_token}))
+    Ok(web::Json(TokenGenResponse {
+        access_token,
+        refresh_token: ref_token,
+    }))
 }
 
 #[post("/register")]
@@ -222,13 +238,23 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
     .await
 }
 
-#[get("/activate/{token}")]
+#[derive(Deserialize)]
+struct Email {
+    email: String,
+}
+#[post("/activate/{token}")]
 async fn activate_account(
     token: Path<String>,
     data: web::Data<AppState>,
+    mut email: web::Json<Email>,
 ) -> Result<String, ServiceError> {
     let tokens = data.activators_reg.read().await;
-    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
+    let token = &token.into_inner();
+    let email = mem::take(&mut email.email);
+    let Some(token2) = tokens.get(&email) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
+    if token != token2 {
+        return Err(ServiceError::BadRequest("Bad activation code".into()));
+    }
     let conn = &data.conn;
     let user_query = User::find()
         .filter(user::Column::Email.eq(email))
@@ -243,41 +269,4 @@ async fn activate_account(
     user.update(conn).await.map_err(map_db_err)?;
 
     Ok("account verified successfully".to_string())
-}
-
-async fn send_verification_mail(
-    email: &str,
-    activators: &ActivatorsVec,
-    email_type: VerificationType,
-) -> Result<String, ServiceError> {
-    let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse().unwrap();
-    let to = email
-        .parse()
-        .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
-
-    //add email - activation_link combo to current app state
-    let activation_link = nanoid!();
-    let mail = email_type
-        .email_msg(to, from, &activation_link)
-        .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
-    let mut activators = activators.write().await;
-    (*activators).insert(activation_link, email.into());
-
-    let smtp: AsyncSmtpTransport<AsyncStd1Executor> =
-        AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay("mikut.dev")
-            .unwrap()
-            .credentials(Credentials::new(
-                "kantyna.noreply@mikut.dev".to_owned(),
-                dotenvy::var("EMAIL_PASS")
-                    .expect("NO EMAIL_PASS val provided in .env")
-                    .to_string(),
-            ))
-            .authentication(vec![Mechanism::Plain])
-            .pool_config(PoolConfig::new().max_size(20))
-            .build();
-
-    match smtp.send(mail).await {
-        Err(_) => Err(ServiceError::InternalError),
-        Ok(_) => Ok("email send".to_string()),
-    }
 }
