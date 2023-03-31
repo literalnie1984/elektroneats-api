@@ -16,6 +16,9 @@ pub enum ServiceError {
     #[display(fmt = "{}", _0)]
     Unauthorized(String),
 
+    #[display(fmt = "{}", _0)]
+    NotFound(String),
+
     #[display(fmt = "Invalid Token")]
     JWTInvalidToken,
 }
@@ -33,6 +36,7 @@ impl ResponseError for ServiceError {
             ServiceError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ServiceError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ServiceError::JWTInvalidToken => StatusCode::UNAUTHORIZED,
+            ServiceError::NotFound(_) => StatusCode::NOT_FOUND,
         }
     }
 }

@@ -62,21 +62,21 @@ async fn change_password(
 }
 
 #[get("/get-user-data")]
-async fn get_user_data(user: AuthUser, data: web::Data<AppState>) -> impl Responder {
-    let conn = &data.conn;
+async fn get_user_data(user: AuthUser) -> impl Responder {
+    // let conn = &data.conn;
 
-    let user_query = User::find()
-        .filter(user::Column::Id.eq(user.id))
-        .one(conn)
-        .await
-        .map_err(map_db_err)?;
+    // let user_query = User::find()
+    //     .filter(user::Column::Id.eq(user.id))
+    //     .one(conn)
+    //     .await
+    //     .map_err(map_db_err)?;
 
-    let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+    // let Some(user) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
 
-    Ok(web::Json(UserJson {
+    web::Json(UserJson {
         username: user.username,
-        admin: user.admin != 0,
-    }))
+        admin: user.is_admin,
+    })
 }
 
 #[get("/delete")]
@@ -140,7 +140,7 @@ async fn login(
     let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        let token = match create_jwt(user_query.id, user_query.admin) {
+        let token = match create_jwt(user_query.id, user_query.admin, &user_query.username) {
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);

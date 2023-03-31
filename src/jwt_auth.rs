@@ -13,6 +13,7 @@ const JWT_SECRET: &[u8] =
 
 pub struct AuthUser {
     pub id: i32,
+    pub username: String,
     pub is_admin: bool,
 }
 
@@ -66,18 +67,20 @@ impl FromRequest for AuthUser {
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     sub: String,
+    username: String,
     is_admin: bool,
     exp: usize,
 }
 
-pub fn create_jwt(uid: i32, is_admin: i8) -> Result<String, JwtError> {
+pub fn create_jwt(uid: i32, is_admin: i8, username: &str) -> Result<String, JwtError> {
     let expiration = Utc::now()
-        .checked_add_signed(chrono::Duration::seconds(60))
+        .checked_add_signed(chrono::Duration::seconds(60*10))
         .expect("valid timestamp")
         .timestamp();
 
     let claims = Claims {
         sub: uid.to_string(),
+        username: username.to_string(),
         is_admin: is_admin == 1,
         exp: expiration as usize,
     };
@@ -102,10 +105,10 @@ fn decode_jwt_token(token: String) -> Result<AuthUser, ServiceError> {
         .sub
         .parse::<i32>()
         .map_err(|_| ServiceError::JWTInvalidToken)?;
-    let is_admin = decoded.claims.is_admin;
 
     Ok(AuthUser {
         id: uid,
-        is_admin: is_admin,
+        is_admin: decoded.claims.is_admin,
+        username: decoded.claims.username,
     })
 }
