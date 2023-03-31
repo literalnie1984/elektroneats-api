@@ -3,6 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use actix_web::{get, post, web, Responder};
 use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use serde::Serialize;
 use std::mem;
 use stripe::{self, Client, CreateCustomer, Customer, CustomerId};
 
@@ -22,13 +23,19 @@ async fn pay() -> Result<String, ServiceError> {
     todo!()
 }
 
+#[derive(Serialize)]
+struct Balance {
+    balance: f32,
+}
 #[get("/balance")]
 async fn get_balance(
     user: AuthUser,
     data: web::Data<AppState>,
-) -> Result<web::Json<f32>, ServiceError> {
+) -> Result<web::Json<Balance>, ServiceError> {
     let user = get_user(&data.conn, user.id).await?;
-    Ok(web::Json(user.balance.unwrap() as f32 / 100.0)) // 1564 -> 15.64
+    Ok(web::Json(Balance {
+        balance: user.balance.unwrap() as f32 / 100.0,
+    })) // 1564 -> 15.64
 }
 
 #[get("/details")]
