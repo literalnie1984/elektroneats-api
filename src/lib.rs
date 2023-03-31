@@ -1,4 +1,5 @@
 use log::error;
+use migration::DbErr;
 use std::fmt::Display;
 
 use errors::ServiceError;
@@ -19,11 +20,8 @@ where
     ServiceError::InternalError
 }
 
-pub fn map_db_err<E>(err: E) -> ServiceError
-where
-    E: Display,
-{
-    convert_err_to_500(err, Some("Database error"))
+pub fn map_db_err(err: DbErr) -> ServiceError {
+    err.into()
 }
 
 #[macro_export]

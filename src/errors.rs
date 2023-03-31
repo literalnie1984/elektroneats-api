@@ -4,6 +4,8 @@ use actix_web::{
     HttpResponse,
 };
 use derive_more::Display;
+use log::error;
+use migration::DbErr;
 
 #[derive(Debug, Display)]
 pub enum ServiceError {
@@ -34,5 +36,13 @@ impl ResponseError for ServiceError {
             ServiceError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ServiceError::JWTInvalidToken => StatusCode::UNAUTHORIZED,
         }
+    }
+}
+
+impl From<DbErr> for ServiceError {
+    fn from(err: DbErr) -> Self {
+        error!("Databse err: {}", err.to_string());
+
+        Self::InternalError
     }
 }

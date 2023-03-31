@@ -88,10 +88,7 @@ async fn get_user_orders(
 
     let mut response: Vec<OrderResponse> = Vec::new();
     for (order, user_dinner) in orders.into_iter().zip(user_dinner_orders.into_iter()) {
-        let dinner = user_dinner
-            .load_one(dinner::Entity, db)
-            .await
-            .map_err(db_err)?;
+        let dinner = user_dinner.load_one(dinner::Entity, db).await?;
 
         let extras = user_dinner
             .load_many_to_many(extras::Entity, extras_order::Entity, db)
