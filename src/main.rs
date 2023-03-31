@@ -59,7 +59,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("payment")
                     .service(add_balance)
                     .service(init_wallet)
-                    .service(get_customer)
+                    .service(customer_details)
                     .service(pay),
             )
             .service(
