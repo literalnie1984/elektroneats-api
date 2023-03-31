@@ -1,4 +1,4 @@
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{prelude::*, prelude::ColumnType::Decimal};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -23,9 +23,9 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(User::Password).string().not_null())
                     .col(
                         ColumnDef::new(User::Balance)
-                            .integer()
+                            .decimal_len(6, 2)
                             .not_null()
-                            .default(0),
+                            .default(0.0),
                     )
                     .col(
                         ColumnDef::new(User::Verified)
