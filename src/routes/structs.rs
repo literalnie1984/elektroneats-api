@@ -32,6 +32,19 @@ pub struct UserJson {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenGenResponse{
+    pub access_token: String,
+    pub refresh_token: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshTokenRequest{
+    pub refresh_token: String,
+}
+
+#[derive(Serialize)]
 pub struct MenuOneDay {
     pub dinners: Vec<dinner::Model>,
     pub extras: Vec<extras::Model>,

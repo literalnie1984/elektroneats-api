@@ -14,7 +14,7 @@ const JWT_SECRET: &[u8] =
 pub struct AuthUser {
     pub id: i32,
     pub username: String,
-    pub balance: f32,
+    pub email: String,
     pub is_admin: bool,
 }   
 
@@ -56,9 +56,9 @@ impl FromRequest for AuthUser {
             }
         };
 
-        let user = match decode_jwt_token(token.to_string()) {
+        let user = match decode_access_token(token.to_string()) {
             Ok(l) => l,
-            Err(_) => return return_func(ServiceError::JWTInvalidToken),
+            Err(_) => return return_func(ServiceError::JWTInvalidAccessToken),
         };
 
         std::future::ready(Ok(user))
@@ -69,12 +69,12 @@ impl FromRequest for AuthUser {
 struct AccessTokenClaims {
     sub: String,
     username: String,
+    email: String,
     is_admin: bool,
-    balance: f32,
     exp: usize,
 }
 
-pub fn create_jwt(uid: i32, is_admin: i8, username: &str, balance: f32) -> Result<String, JwtError> {
+pub fn encode_access_token(uid: i32, is_admin: i8, username: &str, email: &str) -> Result<String, JwtError> {
     let expiration = Utc::now()
         .checked_add_signed(chrono::Duration::seconds(60*10))
         .expect("valid timestamp")
@@ -84,7 +84,7 @@ pub fn create_jwt(uid: i32, is_admin: i8, username: &str, balance: f32) -> Resul
         sub: uid.to_string(),
         username: username.to_string(),
         is_admin: is_admin == 1,
-        balance: balance,
+        email: email.to_string(),
         exp: expiration as usize,
     };
 
@@ -95,29 +95,65 @@ pub fn create_jwt(uid: i32, is_admin: i8, username: &str, balance: f32) -> Resul
     )
 }
 
-fn decode_jwt_token(token: String) -> Result<AuthUser, ServiceError> {
+fn decode_access_token(token: String) -> Result<AuthUser, ServiceError> {
     let decoded = decode::<AccessTokenClaims>(
         &token,
         &DecodingKey::from_secret(JWT_SECRET),
         &Validation::default(),
     )
-    .map_err(|_| ServiceError::JWTInvalidToken)?;
+    .map_err(|_| ServiceError::JWTInvalidAccessToken)?;
 
     let uid = decoded
         .claims
         .sub
         .parse::<i32>()
-        .map_err(|_| ServiceError::JWTInvalidToken)?;
+        .map_err(|_| ServiceError::JWTInvalidAccessToken)?;
 
     Ok(AuthUser {
         id: uid,
         is_admin: decoded.claims.is_admin,
         username: decoded.claims.username,
-        balance: decoded.claims.balance
+        email: decoded.claims.email,
     })
 }
 
-// #[derive(Debug, Serialize, Deserialize)]
-// struct RefreshToken{
+#[derive(Debug, Serialize, Deserialize)]
+struct RefreshTokenClaims {
+    sub: String,
+    exp: usize,
+}
 
-// }
+pub fn decode_refresh_token(token: &str) -> Result<i32, ServiceError>{
+    let decoded = decode::<RefreshTokenClaims>(
+        token,
+        &DecodingKey::from_secret(JWT_SECRET),
+        &Validation::default(),
+    )
+    .map_err(|_| ServiceError::JWTInvalidRefreshToken)?;
+
+    let uid = decoded
+        .claims
+        .sub
+        .parse::<i32>()
+        .map_err(|_| ServiceError::JWTInvalidRefreshToken)?;
+
+    Ok(uid)
+}
+
+pub fn encode_refresh_token(uid: i32) -> Result<String, JwtError> {
+    let expiration = Utc::now()
+        .checked_add_signed(chrono::Duration::seconds(60*60*24))
+        .expect("valid timestamp")
+        .timestamp();
+
+    let claims = RefreshTokenClaims {
+        sub: uid.to_string(),
+        exp: expiration as usize,
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(JWT_SECRET),
+    )
+}

@@ -1,8 +1,11 @@
+use std::mem;
+
 use actix_web::web::Path;
 use actix_web::{get, post, web, Responder};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use lettre::{AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport};
+use sea_orm::prelude::Decimal;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -14,11 +17,11 @@ use serde::Serialize;
 
 use crate::appstate::{ActivatorsVec, AppState};
 use crate::enums::VerificationType;
-use crate::routes::structs::UserJson;
+use crate::routes::structs::{UserJson, TokenGenResponse, RefreshTokenRequest};
 use crate::{convert_err_to_500, map_db_err};
 
 use crate::errors::ServiceError;
-use crate::jwt_auth::create_jwt;
+use crate::jwt_auth::{encode_access_token, encode_refresh_token, decode_refresh_token};
 use crate::jwt_auth::AuthUser;
 use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
@@ -123,11 +126,39 @@ async fn delete_acc(
     }
 }
 
+#[post("/refresh-token")]
+async fn refresh_token(
+    mut refresh_token: web::Json<RefreshTokenRequest>, 
+    data: web::Data<AppState>
+) -> Result<web::Json<TokenGenResponse>, ServiceError>{
+    let conn = &data.conn;
+    let uid = decode_refresh_token(&refresh_token.refresh_token)?;
+
+    let user_query = User::find()
+        .filter(user::Column::Id.eq(uid))
+        .one(conn)
+        .await
+        .map_err(map_db_err)?;
+    let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
+
+    let new_access_token = encode_access_token(
+        user_query.id, user_query.admin, &user_query.username, &user_query.email
+    ).map_err(|err|{
+        error!("Error: {}", err);
+        ServiceError::InternalError
+    })?;
+
+    Ok(web::Json(TokenGenResponse{ 
+        access_token: new_access_token, 
+        refresh_token: mem::take(&mut refresh_token.refresh_token)
+    }))
+}
+
 #[post("/login")]
 async fn login(
     user: web::Json<UserLogin>,
     data: web::Data<AppState>,
-) -> Result<String, ServiceError> {
+) -> Result<web::Json<TokenGenResponse>, ServiceError> {
     let conn = &data.conn;
     let user = user.into_inner();
     let user_query = User::find()
@@ -139,21 +170,33 @@ async fn login(
     let Some(user_query) = user_query else {return Err(ServiceError::BadRequest("Account does not exist".into()))};
     let result = verify(&user.password, &user_query.password).unwrap();
 
-    if result {
-        let token = match create_jwt(user_query.id, user_query.admin, &user_query.username, user_query.balance) {
-            Ok(token) => token,
-            Err(error) => {
-                eprintln!("Error creating token: {}", error);
-                return Err(ServiceError::InternalError);
-            }
-        };
-
-        Ok(token)
-    } else {
-        Err(ServiceError::Unauthorized(
+    if !result{
+        return Err(ServiceError::Unauthorized(
             "Invalid credentials".to_string(),
-        ))
+        ));
     }
+
+    let access_token = match encode_access_token(
+        user_query.id, user_query.admin, &user_query.username, &user_query.email
+    ) {
+        Ok(token) => token,
+        Err(error) => {
+            eprintln!("Error creating token: {}", error);
+            return Err(ServiceError::InternalError);
+        }
+    };
+
+    let ref_token = match encode_refresh_token(
+        user_query.id
+    ) {
+        Ok(token) => token,
+        Err(error) => {
+            eprintln!("Error creating token: {}", error);
+            return Err(ServiceError::InternalError);
+        }
+    };
+
+    Ok(web::Json(TokenGenResponse{access_token, refresh_token: ref_token}))
 }
 
 #[post("/register")]
