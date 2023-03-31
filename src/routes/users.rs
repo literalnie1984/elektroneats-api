@@ -140,7 +140,7 @@ async fn login(
     let result = verify(&user.password, &user_query.password).unwrap();
 
     if result {
-        let token = match create_jwt(user_query.id, user_query.admin, &user_query.username) {
+        let token = match create_jwt(user_query.id, user_query.admin, &user_query.username, user_query.balance) {
             Ok(token) => token,
             Err(error) => {
                 eprintln!("Error creating token: {}", error);

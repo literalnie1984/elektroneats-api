@@ -14,8 +14,9 @@ const JWT_SECRET: &[u8] =
 pub struct AuthUser {
     pub id: i32,
     pub username: String,
+    pub balance: f32,
     pub is_admin: bool,
-}
+}   
 
 impl FromRequest for AuthUser {
     type Error = ServiceError;
@@ -65,23 +66,25 @@ impl FromRequest for AuthUser {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Claims {
+struct AccessTokenClaims {
     sub: String,
     username: String,
     is_admin: bool,
+    balance: f32,
     exp: usize,
 }
 
-pub fn create_jwt(uid: i32, is_admin: i8, username: &str) -> Result<String, JwtError> {
+pub fn create_jwt(uid: i32, is_admin: i8, username: &str, balance: f32) -> Result<String, JwtError> {
     let expiration = Utc::now()
         .checked_add_signed(chrono::Duration::seconds(60*10))
         .expect("valid timestamp")
         .timestamp();
 
-    let claims = Claims {
+    let claims = AccessTokenClaims {
         sub: uid.to_string(),
         username: username.to_string(),
         is_admin: is_admin == 1,
+        balance: balance,
         exp: expiration as usize,
     };
 
@@ -93,7 +96,7 @@ pub fn create_jwt(uid: i32, is_admin: i8, username: &str) -> Result<String, JwtE
 }
 
 fn decode_jwt_token(token: String) -> Result<AuthUser, ServiceError> {
-    let decoded = decode::<Claims>(
+    let decoded = decode::<AccessTokenClaims>(
         &token,
         &DecodingKey::from_secret(JWT_SECRET),
         &Validation::default(),
@@ -110,5 +113,11 @@ fn decode_jwt_token(token: String) -> Result<AuthUser, ServiceError> {
         id: uid,
         is_admin: decoded.claims.is_admin,
         username: decoded.claims.username,
+        balance: decoded.claims.balance
     })
 }
+
+// #[derive(Debug, Serialize, Deserialize)]
+// struct RefreshToken{
+
+// }
