@@ -33,14 +33,14 @@ pub struct UserJson {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TokenGenResponse{
+pub struct TokenGenResponse {
     pub access_token: String,
     pub refresh_token: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RefreshTokenRequest{
+pub struct RefreshTokenRequest {
     pub refresh_token: String,
 }
 
@@ -97,8 +97,23 @@ pub struct OrderResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct UserWithOrders{
+pub struct UserWithOrders {
     pub user_id: i32,
     pub username: String,
     pub orders: Vec<OrderResponse>,
+}
+
+#[derive(Deserialize)]
+pub struct StripeUser {
+    pub address: Address,
+    pub name: String,
+    pub phone: String,
+}
+
+#[derive(Deserialize)]
+pub struct Address {
+    pub city: String,
+    pub country: String,
+    pub postal_code: String,
+    pub state: String,
 }
