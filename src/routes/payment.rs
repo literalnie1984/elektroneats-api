@@ -118,11 +118,11 @@ async fn init_wallet(
     data: web::Data<AppState>,
     mut stripe_data: web::Json<StripeUser>,
 ) -> Result<String, ServiceError> {
-    /* if !user.is_validate {
+    if !user.is_verified {
         return Err(ServiceError::BadRequest(
             "Your account must be validated before initializing wallet".into(),
         ));
-    } */
+    }
 
     let client = &data.stripe_client.0;
     let conn = &data.conn;
