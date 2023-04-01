@@ -15,7 +15,7 @@ use crate::{
 
 use super::structs::{AddReturn, StripeUser};
 
-#[post("/add_balance/{amount:[0-9]+}")]
+#[post("/add-balance/{amount:[0-9]+}")]
 async fn add_balance(
     data: web::Data<AppState>,
     amount: web::Path<i64>,

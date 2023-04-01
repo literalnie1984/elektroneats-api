@@ -12,7 +12,7 @@ use crate::{
 
 use super::structs::UpdateMenu;
 
-#[put("/update_dish")]
+#[put("/update-dish")]
 async fn update_dish(
     user: AuthUser,
     data: web::Data<AppState>,
