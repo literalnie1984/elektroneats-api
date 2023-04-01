@@ -25,16 +25,16 @@ async fn pay() -> Result<String, ServiceError> {
 
 #[derive(Serialize)]
 struct Balance {
-    balance: f32,
+    balance: i64,
 }
 #[get("/balance")]
 async fn get_balance(
     user: AuthUser,
     data: web::Data<AppState>,
 ) -> Result<web::Json<Balance>, ServiceError> {
-    let user = get_user(&data.conn, user.id).await?;
+    let user = get_user(&data.conn, user.id, &data.stripe_client.0).await?;
     Ok(web::Json(Balance {
-        balance: user.balance.unwrap() as f32 / 100.0,
+        balance: user.balance.unwrap(),
     })) // 1564 -> 15.64
 }
 
@@ -43,7 +43,7 @@ async fn customer_details(
     user: AuthUser,
     data: web::Data<AppState>,
 ) -> Result<web::Json<Customer>, ServiceError> {
-    let user = get_user(&data.conn, user.id).await?;
+    let user = get_user(&data.conn, user.id, &data.stripe_client.0).await?;
     Ok(web::Json(user))
 }
 
@@ -53,8 +53,7 @@ async fn init_wallet(
     data: web::Data<AppState>,
     mut stripe_data: web::Json<StripeUser>,
 ) -> Result<String, ServiceError> {
-    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
-    let client = Client::new(secret_key);
+    let client = &data.stripe_client.0;
     let conn = &data.conn;
 
     let user = User::find_by_id(user.id)
@@ -80,7 +79,7 @@ async fn init_wallet(
         }
     };
     let customer = Customer::create(
-        &client,
+        client,
         CreateCustomer {
             email: Some(&user.email),
             name: Some(&stripe_data.name),
@@ -100,10 +99,11 @@ async fn init_wallet(
     Ok("Success".into())
 }
 
-async fn get_user(conn: &DatabaseConnection, user_id: i32) -> Result<Customer, ServiceError> {
-    let secret_key = dotenvy::var("STRIPE_SECRET").expect("No STRIPE_SECRET variable in dotenv");
-    let client = Client::new(secret_key);
-
+async fn get_user(
+    conn: &DatabaseConnection,
+    user_id: i32,
+    client: &Client,
+) -> Result<Customer, ServiceError> {
     let user = User::find_by_id(user_id)
         .one(conn)
         .await
@@ -111,7 +111,7 @@ async fn get_user(conn: &DatabaseConnection, user_id: i32) -> Result<Customer, S
     let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
     if let Some(user_id) = user.stripe_id {
         let id: CustomerId = CustomerId::from_str(&user_id).unwrap();
-        let customer = Customer::retrieve(&client, &id, &[])
+        let customer = Customer::retrieve(client, &id, &[])
             .await
             .map_err(|e| convert_err_to_500(e, Some("Stripe err")))?;
         Ok(customer)

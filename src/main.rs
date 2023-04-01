@@ -9,7 +9,7 @@ use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
 use migration::{Migrator, MigratorTrait};
 
-use kantyna_api::appstate::AppState;
+use kantyna_api::appstate::{AppState, ClientWrapper};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -21,6 +21,9 @@ async fn main() -> std::io::Result<()> {
 
     dotenvy::dotenv().expect(".env file not found");
     let db_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
+    let stripe_secret =
+        dotenvy::var("STRIPE_SECRET").expect("STRIPE_SECRET is not set in .env file");
+    let stripe_client = ClientWrapper::new(&stripe_secret);
 
     let connection = sea_orm::Database::connect(&db_url).await.unwrap();
     Migrator::up(&connection, None).await.unwrap();
@@ -30,6 +33,7 @@ async fn main() -> std::io::Result<()> {
         conn: connection,
         activators_reg: Arc::new(RwLock::new(HashMap::new())),
         activators_del: Arc::new(RwLock::new(HashMap::new())),
+        stripe_client,
     });
 
     HttpServer::new(move || {
