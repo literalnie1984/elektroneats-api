@@ -1730,6 +1730,7 @@ dependencies = [
  "log",
  "migration",
  "nanoid",
+ "rust_decimal",
  "rustls",
  "scraper",
  "sea-orm",

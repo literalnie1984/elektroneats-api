@@ -1,6 +1,6 @@
 use sea_orm::{Related, RelationDef, RelationTrait, Linked};
 
-use crate::{dinner, extras, extras_dinner};
+use crate::{dinner, extras, extras_dinner, user, dinner_orders, user_dinner_orders};
 
 impl Related<crate::extras::Entity> for crate::dinner::Entity {
     fn to() -> RelationDef {
@@ -81,3 +81,19 @@ impl Linked for DinnerToExtras {
 //         ]
 //     }
 // }
+
+#[derive(Debug)]
+pub struct DinnerOrdersToDinners;
+
+impl Linked for DinnerOrdersToDinners {
+    type FromEntity = dinner_orders::Entity;
+
+    type ToEntity = dinner::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        vec![
+            user_dinner_orders::Relation::DinnerOrders.def().rev(),
+            user_dinner_orders::Relation::Dinner.def()
+        ]
+    }
+}

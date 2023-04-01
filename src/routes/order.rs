@@ -1,8 +1,11 @@
-use std::{mem, collections::HashSet};
+use std::{mem, collections::{HashSet, HashMap}};
 
 use actix_web::{get, post, web};
 use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set};
+use log::info;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 use crate::{
     appstate::AppState,
@@ -22,6 +25,37 @@ async fn create_order(
     let db = &data.conn;
     let order = order.into_inner();
     let user_id = user.id;
+
+    let dinner_ids = 
+    order.dinners.iter().map(|x| x.dinner_id).collect::<Vec<_>>();
+
+    let extras_ids = 
+    order.dinners.iter().map(|x| x.extras_ids.clone()).flatten().collect::<Vec<_>>();
+
+    let dinners:Vec<(i32, Decimal)> = dinner::Entity::find()
+        .filter(dinner::Column::Id.is_in(dinner_ids.clone()))
+        .select_only()
+        .column(dinner::Column::Id)
+        .column(dinner::Column::Price)
+        .into_tuple()
+        .all(db)
+        .await.map_err(map_db_err)?;
+    let extras:Vec<(i32, Decimal)> = extras::Entity::find()
+        .filter(extras::Column::Id.is_in(extras_ids.clone()))
+        .select_only()
+        .column(extras::Column::Id)
+        .column(extras::Column::Price)
+        .into_tuple()
+        .all(db)
+        .await.map_err(map_db_err)?;
+    let dinners: HashMap<_, _>= dinners.into_iter().collect();
+    let extras: HashMap<_, _>= extras.into_iter().collect();
+
+    let price: f64 = 
+    dinner_ids.into_iter().map(|x| dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap()).sum::<f64>() +
+    extras_ids.into_iter().map(|x| extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap()).sum::<f64>();
+    
+    info!("PRICE PRICE PRICE: {}", price);
 
     let dinner_order = dinner_orders::ActiveModel {
         user_id: Set(user_id),
