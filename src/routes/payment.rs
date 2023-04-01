@@ -16,8 +16,8 @@ use crate::{
 use super::structs::{AddReturn, StripeUser};
 
 //for development purposes
-const WEB_HOOK_SECRET: &'static str =
-    "whsec_f8729a0c2875d30a6466924337e8af2057a894595d348f0e0092878ec1e40d08";
+const WEB_HOOK_SECRET: String =
+    dotenvy::var("WEBHOOK_SECRET").expect("No WEBHOOK_SECRET provided in .env");
 
 #[post("/add_balance/{amount:[0-9]+}")]
 async fn add_balance(
@@ -57,10 +57,10 @@ async fn received_payment(
 
     let stripe_sig = get_header_val(&req, "stripe-signature").unwrap_or_default();
 
-    let Ok(event) = Webhook::construct_event(payload_str, stripe_sig, WEB_HOOK_SECRET) else {return Err(ServiceError::InternalError)};
+    let Ok(event) = Webhook::construct_event(payload_str, stripe_sig, &WEB_HOOK_SECRET) else {return Err(ServiceError::InternalError)};
 
     //for dev reasons @ release switch to payment intent success
-    if event.event_type == EventType::PaymentIntentCreated {
+    if event.event_type == EventType::PaymentIntentSucceeded {
         let EventObject::PaymentIntent(intent_data) = event.data.object else {return Err(ServiceError::InternalError)};
 
         let client = &data.stripe_client.0;
