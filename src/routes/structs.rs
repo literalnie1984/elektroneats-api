@@ -117,3 +117,9 @@ pub struct Address {
     pub postal_code: String,
     pub state: String,
 }
+
+#[derive(Serialize)]
+pub struct AddReturn {
+    pub customer_id: String,
+    pub intent_secret: String,
+}

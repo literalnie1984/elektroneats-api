@@ -5,17 +5,40 @@ use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
 use std::mem;
-use stripe::{self, Client, CreateCustomer, Customer, CustomerId};
+use stripe::{
+    self, Client, CreateCustomer, CreatePaymentIntent, Customer, CustomerId, PaymentIntent,
+};
 
 use crate::{
     appstate::AppState, convert_err_to_500, errors::ServiceError, jwt_auth::AuthUser, map_db_err,
 };
 
-use super::structs::StripeUser;
+use super::structs::{AddReturn, StripeUser};
 
 #[post("/add_balance/{amount:[0-9]+}")]
-async fn add_balance() -> Result<String, ServiceError> {
-    todo!()
+async fn add_balance(
+    data: web::Data<AppState>,
+    amount: web::Path<i64>,
+    user: AuthUser,
+) -> Result<web::Json<AddReturn>, ServiceError> {
+    let client = &data.stripe_client.0;
+    let customer = get_user(&data.conn, user.id, client).await?;
+    let customer_id = customer.id.to_string();
+
+    let intent = {
+        let mut intent = CreatePaymentIntent::new(amount.into_inner(), stripe::Currency::PLN);
+        intent.payment_method_types = Some(vec!["card".into(), "p24".into()]);
+        intent.customer = Some(customer.id);
+
+        PaymentIntent::create(client, intent)
+            .await
+            .map_err(|e| convert_err_to_500(e, Some("Stripe Error")))?
+    };
+
+    Ok(web::Json(AddReturn {
+        customer_id,
+        intent_secret: intent.client_secret.unwrap(),
+    }))
 }
 
 #[post("/pay/{amount:[0-9]+}")]
