@@ -1,3 +1,4 @@
+use actix_web::HttpRequest;
 use appstate::ActivatorsVec;
 use enums::VerificationType;
 use lettre::{

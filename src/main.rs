@@ -65,6 +65,7 @@ async fn main() -> std::io::Result<()> {
                     .service(init_wallet)
                     .service(get_balance)
                     .service(customer_details)
+                    .service(test_balance)
                     .service(pay),
             )
             .service(
