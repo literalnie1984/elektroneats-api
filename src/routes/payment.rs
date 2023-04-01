@@ -13,10 +13,15 @@ use stripe::{
 };
 
 use crate::{
-    appstate::AppState, convert_err_to_500, errors::ServiceError, jwt_auth::AuthUser, map_db_err,
+    appstate::AppState, convert_err_to_500, errors::ServiceError, get_header_val,
+    jwt_auth::AuthUser, map_db_err,
 };
 
 use super::structs::{AddReturn, StripeUser};
+
+//for development purposes
+const WEB_HOOK_SECRET: &'static str =
+    "whsec_f8729a0c2875d30a6466924337e8af2057a894595d348f0e0092878ec1e40d08";
 
 #[post("/add_balance/{amount:[0-9]+}")]
 async fn add_balance(
@@ -42,6 +47,43 @@ async fn add_balance(
         customer_id,
         intent_secret: intent.client_secret.unwrap(),
     }))
+}
+
+//Webhook for stripe to use
+#[post("/received")]
+async fn received_payment(
+    req: HttpRequest,
+    payload: web::Bytes,
+    data: web::Data<AppState>,
+) -> Result<String, ServiceError> {
+    eprintln!("{payload:?}");
+    let payload_str = std::str::from_utf8(payload.borrow()).unwrap();
+
+    let stripe_sig = get_header_val(&req, "stripe-signature").unwrap_or_default();
+
+    let Ok(event) = Webhook::construct_event(payload_str, stripe_sig, WEB_HOOK_SECRET) else {return Err(ServiceError::InternalError)};
+
+    if event.event_type == EventType::PaymentIntentCreated {
+        let EventObject::PaymentIntent(intent_data) = event.data.object else {return Err(ServiceError::InternalError)};
+        let client = &data.stripe_client.0;
+        let customer = &intent_data.customer.unwrap();
+        let customer_id = &customer.id();
+
+        Customer::update(
+            client,
+            customer_id,
+            UpdateCustomer {
+                balance: Some(intent_data.amount),
+                ..Default::default()
+            },
+        )
+        .await
+        .map_err(|e| convert_err_to_500(e, Some("Stripe error")))?;
+    } else {
+        return Err(ServiceError::InternalError);
+    }
+
+    Ok("tak".into())
 }
 
 //test path for user with id 1

@@ -80,3 +80,7 @@ pub async fn send_verification_mail(
         Ok(_) => Ok("email send".to_string()),
     }
 }
+
+pub fn get_header_val<'r>(req: &'r HttpRequest, key: &'r str) -> Option<&'r str> {
+    req.headers().get(key)?.to_str().ok()
+}
