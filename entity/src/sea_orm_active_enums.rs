@@ -3,7 +3,7 @@
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Default, Hash)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "type")]
 pub enum Type {
     #[sea_orm(string_value = "soup")]
@@ -13,7 +13,7 @@ pub enum Type {
     Main,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Hash)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "type")]
 pub enum ExtrasType {
     #[sea_orm(string_value = "filler")]
