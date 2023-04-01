@@ -128,7 +128,7 @@ async fn get_user_orders(
     }))
 }
 
-#[get("/completed-user-orders")]
+#[get("/completed")]
 async fn get_completed_user_orders(
     user: AuthUser,
     data: web::Data<AppState>,
@@ -139,7 +139,7 @@ async fn get_completed_user_orders(
     get_user_orders(user_id, db, 1).await
 }
 
-#[get("/pending-user-orders")]
+#[get("/pending")]
 async fn get_pending_user_orders(
     user: AuthUser,
     data: web::Data<AppState>,
@@ -150,8 +150,8 @@ async fn get_pending_user_orders(
     get_user_orders(user_id, db, 0).await
 }
 
-#[get("/all-pending-orders")]
-async fn get_all_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<AllUsersOrders>, ServiceError>{
+#[get("/pending")]
+async fn get_all_pending_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<AllUsersOrders>, ServiceError>{
     if !user.is_admin{
         return Err(ServiceError::Unauthorized("Only admin can access that data".to_string()));
     }
