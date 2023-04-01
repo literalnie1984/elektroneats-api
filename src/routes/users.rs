@@ -9,11 +9,11 @@ use nanoid::nanoid;
 
 use entity::prelude::User;
 use entity::user;
+use serde::Deserialize;
 
 use crate::appstate::AppState;
 use crate::enums::VerificationType;
-use crate::routes::structs::UserJson;
-use crate::routes::structs::{RefreshTokenRequest, TokenGenResponse};
+use crate::routes::structs::{RefreshTokenRequest, TokenGenResponse, UserJson};
 use crate::{convert_err_to_500, map_db_err, send_verification_mail};
 
 use crate::errors::ServiceError;
@@ -96,17 +96,23 @@ async fn get_delete_mail(
     send_verification_mail(&user.email, &data.activators_del, VerificationType::Delete).await
 }
 
-#[get("/delete/{token}")]
+#[post("/delete/{token}")]
 async fn delete_acc(
-    _user: AuthUser,
+    user: AuthUser,
     data: web::Data<AppState>,
     token: Path<String>,
 ) -> Result<impl Responder, ServiceError> {
     let tokens = data.activators_del.read().await;
-    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
+    let token = &token.into_inner();
+    let Some(token2) = tokens.get(&user.email) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
+
+    if token != token2 {
+        return Err(ServiceError::BadRequest("Invalid deletion code!".into()));
+    }
+
     let conn = &data.conn;
     let user_query: Option<user::Model> = User::find()
-        .filter(user::Column::Email.eq(email))
+        .filter(user::Column::Email.eq(user.email))
         .one(conn)
         .await
         .map_err(map_db_err)?;
@@ -232,13 +238,23 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
     .await
 }
 
-#[get("/activate/{token}")]
+#[derive(Deserialize)]
+struct Email {
+    email: String,
+}
+#[post("/activate/{token}")]
 async fn activate_account(
     token: Path<String>,
     data: web::Data<AppState>,
+    mut email: web::Json<Email>,
 ) -> Result<String, ServiceError> {
     let tokens = data.activators_reg.read().await;
-    let Some(email) = tokens.get(&token.into_inner()) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
+    let token = &token.into_inner();
+    let email = mem::take(&mut email.email);
+    let Some(token2) = tokens.get(&email) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
+    if token != token2 {
+        return Err(ServiceError::BadRequest("Bad activation code".into()));
+    }
     let conn = &data.conn;
     let user_query = User::find()
         .filter(user::Column::Email.eq(email))

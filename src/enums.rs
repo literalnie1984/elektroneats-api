@@ -10,25 +10,26 @@ impl VerificationType {
         &self,
         to: Mailbox,
         from: Mailbox,
-        activation_link: &str,
+        code: &str,
     ) -> Result<Message, lettre::error::Error> {
         match self {
             &Self::Register => Message::builder()
                 .from(from)
                 .to(to)
                 .subject("Twój kod do kantyny")
-                .body(format!(
-                    "http://127.0.0.1:4765/api/user/activate/{}",
-                    activation_link
-                )),
+                .body(format!("Wpisz ten kod aby aktywowć konto: {}", code)),
             &Self::Delete => Message::builder()
                 .from(from)
                 .to(to)
                 .subject("Kantyna - usuwanie konta")
-                .body(format!(
-                    "http://127.0.0.1:4765/api/user/delete/{}",
-                    activation_link
-                )),
+                .body(format!("Wpisz ten kod aby usunąć konto: {}", code)),
+        }
+    }
+
+    pub fn code_len(&self) -> usize {
+        match self {
+            &Self::Register => 4,
+            &Self::Delete => 8,
         }
     }
 }
