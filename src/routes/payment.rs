@@ -1,15 +1,11 @@
-use std::{borrow::Borrow, collections::HashMap, str::FromStr};
-
 use actix_web::{get, post, web, HttpRequest};
 use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
-use std::mem;
+use std::{borrow::Borrow, collections::HashMap, mem, str::FromStr};
 use stripe::{
-    self, AttachPaymentMethod, CardDetailsParams, Client, CreateCustomer, CreatePaymentIntent,
-    CreatePaymentMethod, Customer, CustomerId, EventObject, EventType, PaymentIntent,
-    PaymentIntentConfirmParams, PaymentMethod, PaymentMethodTypeFilter, UpdateCustomer,
-    UpdatePaymentIntent, Webhook,
+    self, Client, CreateCustomer, CreatePaymentIntent, Customer, CustomerId, EventObject,
+    EventType, PaymentIntent, UpdateCustomer, Webhook,
 };
 
 use crate::{
@@ -94,8 +90,32 @@ async fn received_payment(
 }
 
 #[post("/pay/{amount:[0-9]+}")]
-async fn pay() -> Result<String, ServiceError> {
-    todo!()
+async fn pay(
+    data: web::Data<AppState>,
+    user: AuthUser,
+    amount: web::Path<i64>,
+) -> Result<String, ServiceError> {
+    let decr = amount.into_inner();
+    let client = &data.stripe_client.0;
+
+    let (customer_id, old_balance) = {
+        let customer = get_user(&data.conn, user.id, client).await?;
+
+        (customer.id, customer.balance.unwrap())
+    };
+
+    Customer::update(
+        client,
+        &customer_id,
+        UpdateCustomer {
+            balance: Some(old_balance - decr),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(|e| convert_err_to_500(e, Some("Stripe error")))?;
+
+    Ok("Success".into())
 }
 
 #[derive(Serialize)]
@@ -129,6 +149,12 @@ async fn init_wallet(
     data: web::Data<AppState>,
     mut stripe_data: web::Json<StripeUser>,
 ) -> Result<String, ServiceError> {
+    /* if !user.is_validate {
+        return Err(ServiceError::BadRequest(
+            "Your account must be validated before initializing wallet".into(),
+        ));
+    } */
+
     let client = &data.stripe_client.0;
     let conn = &data.conn;
 
