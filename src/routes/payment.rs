@@ -37,6 +37,7 @@ async fn add_balance(
         let mut intent = CreatePaymentIntent::new(amount.into_inner(), stripe::Currency::PLN);
         intent.payment_method_types = Some(vec!["card".into(), "p24".into()]);
         intent.customer = Some(customer.id);
+        intent.expand = &["customer"];
 
         PaymentIntent::create(client, intent)
             .await
@@ -56,24 +57,30 @@ async fn received_payment(
     payload: web::Bytes,
     data: web::Data<AppState>,
 ) -> Result<String, ServiceError> {
-    eprintln!("{payload:?}");
     let payload_str = std::str::from_utf8(payload.borrow()).unwrap();
 
     let stripe_sig = get_header_val(&req, "stripe-signature").unwrap_or_default();
 
     let Ok(event) = Webhook::construct_event(payload_str, stripe_sig, WEB_HOOK_SECRET) else {return Err(ServiceError::InternalError)};
 
+    //for dev reasons @ release switch to payment intent success
     if event.event_type == EventType::PaymentIntentCreated {
         let EventObject::PaymentIntent(intent_data) = event.data.object else {return Err(ServiceError::InternalError)};
+
         let client = &data.stripe_client.0;
         let customer = &intent_data.customer.unwrap();
         let customer_id = &customer.id();
+        let customer_balance = Customer::retrieve(client, customer_id, &[])
+            .await
+            .map_err(|e| convert_err_to_500(e, Some("Stripe error")))?
+            .balance
+            .unwrap();
 
         Customer::update(
             client,
             customer_id,
             UpdateCustomer {
-                balance: Some(intent_data.amount),
+                balance: Some(intent_data.amount + customer_balance),
                 ..Default::default()
             },
         )
@@ -86,74 +93,6 @@ async fn received_payment(
     Ok("tak".into())
 }
 
-//test path for user with id 1
-#[get("/test_balance")]
-async fn test_balance(data: web::Data<AppState>) -> Result<String, ServiceError> {
-    let client = &data.stripe_client.0;
-    let customer = get_user(&data.conn, 1, client).await?;
-
-    let intent = {
-        let mut intent = CreatePaymentIntent::new(5000, stripe::Currency::PLN);
-        intent.payment_method_types = Some(vec!["card".into(), "p24".into()]);
-        intent.customer = Some(customer.id.clone());
-
-        PaymentIntent::create(client, intent)
-            .await
-            .map_err(|e| convert_err_to_500(e, Some("Stripe Error")))?
-    };
-
-    let payment_method = {
-        let pm = PaymentMethod::create(
-            client,
-            CreatePaymentMethod {
-                type_: Some(PaymentMethodTypeFilter::Card),
-                card: Some(stripe::CreatePaymentMethodCardUnion::CardDetailsParams(
-                    CardDetailsParams {
-                        number: "4000006160000005".to_string(), // UK visa
-                        exp_year: 2025,
-                        exp_month: 1,
-                        cvc: Some("123".to_string()),
-                        ..Default::default()
-                    },
-                )),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        pm
-    };
-
-    PaymentMethod::attach(
-        client,
-        &payment_method.id,
-        AttachPaymentMethod {
-            customer: customer.id.clone(),
-        },
-    );
-
-    let intent = PaymentIntent::update(
-        client,
-        &intent.id,
-        UpdatePaymentIntent {
-            payment_method: Some(payment_method.id),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    PaymentIntent::confirm(
-        client,
-        &intent.id,
-        PaymentIntentConfirmParams {
-            ..Default::default()
-        },
-    );
-
-    Ok("send".into())
-}
-
 #[post("/pay/{amount:[0-9]+}")]
 async fn pay() -> Result<String, ServiceError> {
     todo!()
@@ -163,6 +102,7 @@ async fn pay() -> Result<String, ServiceError> {
 struct Balance {
     balance: i64,
 }
+
 #[get("/balance")]
 async fn get_balance(
     user: AuthUser,
@@ -257,3 +197,75 @@ async fn get_user(
         ))
     }
 }
+
+// USE add_balance for testing - it works too!
+/*
+//test path for user with id 1
+#[get("/test_balance")]
+async fn test_balance(data: web::Data<AppState>) -> Result<String, ServiceError> {
+    let client = &data.stripe_client.0;
+    let customer = get_user(&data.conn, 1, client).await?;
+
+    let intent = {
+        let mut intent = CreatePaymentIntent::new(5000, stripe::Currency::PLN);
+        intent.payment_method_types = Some(vec!["card".into(), "p24".into()]);
+        intent.customer = Some(customer.id.clone());
+        intent.expand = &["customer"];
+
+        PaymentIntent::create(client, intent)
+            .await
+            .map_err(|e| convert_err_to_500(e, Some("Stripe Error")))?
+    };
+
+    let payment_method = {
+        let pm = PaymentMethod::create(
+            client,
+            CreatePaymentMethod {
+                type_: Some(PaymentMethodTypeFilter::Card),
+                card: Some(stripe::CreatePaymentMethodCardUnion::CardDetailsParams(
+                    CardDetailsParams {
+                        number: "4000006160000005".to_string(), // UK visa
+                        exp_year: 2025,
+                        exp_month: 1,
+                        cvc: Some("123".to_string()),
+                        ..Default::default()
+                    },
+                )),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        pm
+    };
+
+    PaymentMethod::attach(
+        client,
+        &payment_method.id,
+        AttachPaymentMethod {
+            customer: customer.id.clone(),
+        },
+    );
+
+    let intent = PaymentIntent::update(
+        client,
+        &intent.id,
+        UpdatePaymentIntent {
+            payment_method: Some(payment_method.id),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    PaymentIntent::confirm(
+        client,
+        &intent.id,
+        PaymentIntentConfirmParams {
+            ..Default::default()
+        },
+    );
+
+    Ok("send".into())
+}
+*/
