@@ -1,6 +1,8 @@
 use actix_web::HttpRequest;
 use appstate::ActivatorsVec;
+use entity::prelude::User;
 use enums::VerificationType;
+use jwt_auth::AuthUser;
 use lettre::{
     transport::smtp::{
         authentication::{Credentials, Mechanism},
@@ -11,7 +13,9 @@ use lettre::{
 use log::error;
 use migration::DbErr;
 use nanoid::nanoid;
-use std::fmt::Display;
+use sea_orm::{DatabaseConnection, EntityTrait};
+use std::{fmt::Display, str::FromStr};
+use stripe::{Client, Customer, CustomerId, UpdateCustomer};
 
 use errors::ServiceError;
 
@@ -83,4 +87,56 @@ pub async fn send_verification_mail(
 
 pub fn get_header_val<'r>(req: &'r HttpRequest, key: &'r str) -> Option<&'r str> {
     req.headers().get(key)?.to_str().ok()
+}
+
+pub async fn pay(
+    client: &stripe::Client,
+    conn: &DatabaseConnection,
+    user: AuthUser,
+    amount: i64,
+) -> Result<String, ServiceError> {
+    let decr = amount;
+
+    let (customer_id, old_balance) = {
+        let customer = get_user(conn, user.id, client).await?;
+
+        (customer.id, customer.balance.unwrap())
+    };
+
+    Customer::update(
+        client,
+        &customer_id,
+        UpdateCustomer {
+            balance: Some(old_balance - decr),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(|e| convert_err_to_500(e, Some("Stripe error")))?;
+
+    Ok("Success".into())
+}
+
+pub async fn get_user(
+    conn: &DatabaseConnection,
+    user_id: i32,
+    client: &Client,
+) -> Result<Customer, ServiceError> {
+    let user = User::find_by_id(user_id)
+        .one(conn)
+        .await
+        .map_err(map_db_err)?;
+
+    let Some(user) = user else {return Err(ServiceError::BadRequest("No user has given id".into()))};
+    if let Some(user_id) = user.stripe_id {
+        let id: CustomerId = CustomerId::from_str(&user_id).unwrap();
+        let customer = Customer::retrieve(client, &id, &[])
+            .await
+            .map_err(|e| convert_err_to_500(e, Some("Stripe err")))?;
+        Ok(customer)
+    } else {
+        Err(ServiceError::BadRequest(
+            "Stripe wasn't initialized for provided user".into(),
+        ))
+    }
 }

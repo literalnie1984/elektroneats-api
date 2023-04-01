@@ -66,8 +66,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_balance)
                     .service(customer_details)
                     // .service(test_balance)
-                    .service(received_payment)
-                    .service(pay),
+                    .service(received_payment),
             )
             .service(
                 web::scope("/orders")
