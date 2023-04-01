@@ -12,7 +12,7 @@ use crate::{
     convert_err_to_500,
     errors::ServiceError,
     jwt_auth::AuthUser,
-    routes::structs::{OrderRequest, UserWithOrders, DinnerResponse, OrderResponse, AllUsersOrders, UserOrders}, map_db_err,
+    routes::structs::{OrderRequest, UserWithOrders, DinnerResponse, OrderResponse, AllUsersOrders, UserOrders}, map_db_err, get_user, pay,
 };
 
 //TODO: TRANSACTIONS PROBABLY
@@ -51,11 +51,15 @@ async fn create_order(
     let dinners: HashMap<_, _>= dinners.into_iter().collect();
     let extras: HashMap<_, _>= extras.into_iter().collect();
 
-    let price: f64 = 
-    dinner_ids.into_iter().map(|x| dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap()).sum::<f64>() +
-    extras_ids.into_iter().map(|x| extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap()).sum::<f64>();
+    let price: i64 = 
+    dinner_ids.into_iter().map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 1000f64) as i64).sum::<i64>() +
+    extras_ids.into_iter().map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 1000f64) as i64).sum::<i64>();
     
-    info!("PRICE PRICE PRICE: {}", price);
+    let customer = get_user(db, user.id, &data.stripe_client.0).await?;
+    let balance = customer.balance.unwrap();
+    if balance < price{
+        return Err(ServiceError::BadRequest("Not enough money".to_string()));
+    }
 
     let dinner_order = dinner_orders::ActiveModel {
         user_id: Set(user_id),
@@ -98,6 +102,7 @@ async fn create_order(
             .map_err(|e| convert_err_to_500(e, Some("Database error creating extras_order: {}")))?;
     }
 
+    pay(&data.stripe_client.0, db, user, price).await?;
     Ok("Order created successfully".to_string())
 }
 
