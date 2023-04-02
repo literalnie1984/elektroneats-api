@@ -3,13 +3,12 @@ use std::mem;
 use actix_web::{get, web, Responder};
 use chrono::Datelike;
 use entity::{
+    custom_impl::DinnerToExtras,
     dinner,
-    prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras,
-};
-use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    prelude::{Dinner, Extras, ExtrasDinner},
 };
 use sea_orm::ModelTrait;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder};
 
 use crate::{
     appstate::AppState,

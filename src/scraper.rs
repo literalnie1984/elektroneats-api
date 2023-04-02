@@ -11,7 +11,7 @@ use crate::{convert_err_to_500, errors::ServiceError, map_db_err};
 const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
 const TWO_PARTS_DISHES_PREFIXES: [&'static str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 pub struct MenuDay {
     soup: String,
     dishes: Vec<String>,
@@ -105,7 +105,7 @@ fn trim_whitespace(s: &str) -> String {
     owned
 }
 
-pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
+pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
     let site_data = web::block(|| get_menu().expect("Couldn't get site data"))
         .await
         .map_err(|err| convert_err_to_500(err, Some("Fetch site err")))?;
@@ -152,7 +152,14 @@ pub async fn scrape_menu() -> Result<Vec<MenuDay>, ServiceError> {
     weekly_menu.append(&mut vec_to_menu(mon_to_wed));
     weekly_menu.append(&mut vec_to_menu(thu_to_sat));
 
-    Ok(weekly_menu)
+    let correct_menu = weekly_menu
+        .iter_mut()
+        .enumerate()
+        .filter(|(_, menu)| menu.dishes != ["NIECZYNNE"])
+        .map(|(day, menu)| (day as u8, std::mem::take(menu)))
+        .collect();
+
+    Ok(correct_menu)
 }
 
 pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), ServiceError> {
@@ -189,18 +196,18 @@ pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), Servi
 
 pub async fn update_menu(
     conn: &DatabaseConnection,
-    mut menu: Vec<MenuDay>,
+    mut menu: Vec<(u8, MenuDay)>,
 ) -> Result<(), ServiceError> {
     insert_static_extras(conn).await?;
     let mut prev_last_insert_id = 1;
     let mut extras_dinners_all: Vec<extras_dinner::ActiveModel> =
         Vec::with_capacity((3.5 * menu.len() as f32).round() as usize);
 
-    for (day, menu) in menu.iter_mut().enumerate() {
+    for (day, menu) in menu.iter_mut() {
         let soup = dinner::ActiveModel {
             name: Set(take(&mut menu.soup)),
             r#type: Set(entity::sea_orm_active_enums::Type::Soup),
-            week_day: Set(day as u8),
+            week_day: Set(*day),
             max_supply: Set(15),
             price: Set(Decimal::new(15, 1)),
             image: Set("TODO".into()),
@@ -213,7 +220,7 @@ pub async fn update_menu(
             .map(|mut dish| dinner::ActiveModel {
                 name: Set(take(&mut dish)),
                 r#type: Set(entity::sea_orm_active_enums::Type::Main),
-                week_day: Set(day as u8),
+                week_day: Set(*day),
                 max_supply: Set(15),
                 price: Set(Decimal::new(15, 0)),
                 image: Set("TODO".into()),
