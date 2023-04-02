@@ -4,6 +4,7 @@ use entity::{
     prelude::{Dinner, DinnerOrders}, model_enums::Status,
 };
 use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set, ActiveEnum};
+use serde::{Serialize, Deserialize};
 use std::mem;
 
 use crate::{
@@ -52,17 +53,24 @@ async fn update_dish(
     Ok("Success".into())
 }
 
-#[get("/claim/{id}")]
-async fn claim_order(
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusRequest{
+    pub new_status: Status,
+}
+
+#[put("/{id}/status")]
+async fn change_order_status(
     user: AuthUser,
     path: web::Path<i32>,
     data: web::Data<AppState>,
+    body: web::Json<StatusRequest>
 ) -> Result<String, ServiceError> {
-    if !user.is_admin {
-        return Err(ServiceError::Unauthorized(
-            "You need to be an admin to access this".into(),
-        ));
-    }
+    // if !user.is_admin {
+    //     return Err(ServiceError::Unauthorized(
+    //         "You need to be an admin to access this".into(),
+    //     ));
+    // }
 
     let conn = &data.conn;
     let claim_id = path.into_inner();
@@ -73,16 +81,11 @@ async fn claim_order(
             .await
             .map_err(map_db_err)?;
         let Some(order) = order else {return Err(ServiceError::BadRequest("Invalid dinner_order id".into()))};
-        if order.status == Status::Collected.into_value() {
-            return Err(ServiceError::BadRequest(
-                "This order has already been claimed".into(),
-            ));
-        }
         order.into()
     };
 
     //MySQL has no bools
-    order.status = Set(Status::Collected.into_value());
+    order.status = Set(body.into_inner().new_status.into_value());
     order.update(conn).await.map_err(map_db_err)?;
 
     Ok("Success".into())

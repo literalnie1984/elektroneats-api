@@ -90,7 +90,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/admin").service(update_dish).service(
                     web::scope("/orders")
                         .service(get_all_pending_orders)
-                        .service(claim_order),
+                        .service(change_order_status),
                 ),
             )
             .service(

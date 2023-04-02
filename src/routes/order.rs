@@ -108,12 +108,13 @@ async fn create_order(
 async fn get_user_orders(
     user_id: i32,
     db: &DatabaseConnection,
-    completed: bool,
+    status: &[Status],
 ) -> Result<web::Json<UserOrders>, ServiceError> {
     let db_err = |err| convert_err_to_500(err, Some("Database error getting user orders"));
     let orders = dinner_orders::Entity::find()
         .filter(dinner_orders::Column::UserId.eq(user_id))
-        .filter(if completed {dinner_orders::Column::UserId.eq(Status::Collected)} else {dinner_orders::Column::UserId.ne(Status::Collected)})
+        .filter(dinner_orders::Column::Status.is_in(status.to_vec()))
+        // .filter(if completed {dinner_orders::Column::UserId.eq(Status::Collected)} else {dinner_orders::Column::UserId.ne(Status::Collected)})
         .all(db)
         .await
         .map_err(db_err)?;
@@ -181,7 +182,7 @@ async fn get_completed_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, true).await
+    get_user_orders(user_id, db, &[Status::Collected]).await
 }
 
 #[get("/pending")]
@@ -192,7 +193,7 @@ async fn get_pending_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, false).await
+    get_user_orders(user_id, db, &[Status::Paid, Status::Prepared, Status::Ready]).await
 }
 
 #[get("/pending")]
