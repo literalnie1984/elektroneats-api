@@ -61,10 +61,11 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let logger = Logger::default();
-        let cors = Cors::default()
-            .allow_any_origin()
-            .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE]);
+        let cors = Cors::new();
+        // let cors = Cors::default()
+        //     .allow_any_origin()
+        //     .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        //     .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE]);
 
         let routes = web::scope("/api")
             .service(Files::new("/image", "./images"))
