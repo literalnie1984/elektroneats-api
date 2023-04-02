@@ -115,18 +115,24 @@ components:
             - Ready
             - Collected
     MenuVec:
-      type: array
-      items:
-        type: array
-        items:
-          type: object
-          properties:
-            "dinner":
-              $ref: "#/components/schemas/DinnerModel"
-            "extras":
-              type: array
-              items:
-                $ref: "#/components/schemas/ExtrasModel"
+      type: object
+      properties:
+        response:
+          type: array
+          items:
+            type: array
+            items:
+              type: object
+              properties:
+                "dinner":
+                  $ref: "#/components/schemas/DinnerModel"
+                "extrasIds":
+                  type: array
+                  items:
+                    type: integer
+                    format: int32
+        extras:
+          $ref: "#/components/schemas/ExtrasModel"
     MenuDay:
       type: object
       properties:
