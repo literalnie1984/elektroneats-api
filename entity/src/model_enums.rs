@@ -1,4 +1,4 @@
-use sea_orm::{DeriveActiveEnum, EnumIter};
+use sea_orm::{DeriveActiveEnum, EnumIter, strum::FromRepr};
 use serde::{Deserialize, Serialize};
 
 #[derive(DeriveActiveEnum, EnumIter, Serialize, Deserialize, Clone)]
@@ -13,7 +13,7 @@ pub enum Weekday {
     Saturday = 5,
 }
 
-#[derive(DeriveActiveEnum, EnumIter, Serialize, Deserialize, Clone)]
+#[derive(DeriveActiveEnum, EnumIter, Serialize, Deserialize, Clone, FromRepr)]
 #[sea_orm(rs_type = "u8", db_type = "Integer")]
 #[repr(u8)]
 pub enum Status {
