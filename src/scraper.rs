@@ -1,10 +1,13 @@
 use std::{mem::take, vec};
 
 use actix_web::web;
-use entity::{dinner, extras, extras_dinner, menu_info};
+use entity::{dinner, extras, extras_dinner, menu_info, prelude::Dinner};
 use log::info;
 use scraper::{Html, Selector};
-use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set, ActiveValue::NotSet, ActiveModelTrait, Unchanged};
+use sea_orm::{
+    prelude::Decimal, ActiveModelTrait, ActiveValue::NotSet, DatabaseConnection, EntityTrait,
+    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
+};
 use serde::Serialize;
 
 use crate::{convert_err_to_500, errors::ServiceError, map_db_err};
@@ -203,8 +206,20 @@ pub async fn update_menu(
     conn: &DatabaseConnection,
     mut menu: Vec<(u8, MenuDay)>,
 ) -> Result<(), ServiceError> {
-    insert_static_extras(conn).await?;
-    let mut prev_last_insert_id = 1;
+    // insert_static_extras(conn).await?; moved to init_db
+    let mut prev_last_insert_id = {
+        let last_id = Dinner::find()
+            .order_by(dinner::Column::Id, migration::Order::Desc)
+            .one(conn)
+            .await
+            .map_err(map_db_err)?;
+        //if there is no last user id, ther are none so table is empty
+        if let Some(last_id) = last_id {
+            last_id.id
+        } else {
+            1
+        }
+    };
     let mut extras_dinners_all: Vec<extras_dinner::ActiveModel> =
         Vec::with_capacity((3.5 * menu.len() as f32).round() as usize);
 
@@ -280,25 +295,26 @@ pub async fn update_menu(
 
         prev_last_insert_id = curr_last + 2;
     }
-    info!("{:#?}", extras_dinners_all); //SOME SCRAPING PROBLEM
     extras_dinner::Entity::insert_many(extras_dinners_all)
         .exec(conn)
         .await
         .map_err(map_db_err)?;
 
     //last menu update date
-    let menu_info_model = menu_info::ActiveModel{
+    let menu_info_model = menu_info::ActiveModel {
         id: Set(1),
-        last_update: Set(chrono::offset::Utc::now())
+        last_update: Set(chrono::offset::Utc::now()),
     };
 
     menu_info::Entity::insert(menu_info_model)
-    .on_conflict(
-        sea_orm::sea_query::OnConflict::column(menu_info::Column::LastUpdate)
-            .update_column(menu_info::Column::LastUpdate)
-            .to_owned()
-    )
-    .exec(conn).await.map_err(map_db_err)?;
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(menu_info::Column::LastUpdate)
+                .update_column(menu_info::Column::LastUpdate)
+                .to_owned(),
+        )
+        .exec(conn)
+        .await
+        .map_err(map_db_err)?;
 
     Ok(())
 }

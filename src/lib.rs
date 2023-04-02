@@ -1,4 +1,4 @@
-use crate::scraper::{scrape_menu, update_menu};
+use crate::scraper::{insert_static_extras, scrape_menu, update_menu};
 use actix_web::HttpRequest;
 use appstate::ActivatorsVec;
 use entity::prelude::User;
@@ -144,6 +144,7 @@ pub async fn get_user(
 
 pub async fn init_db(conn: &DatabaseConnection) -> Result<(), ServiceError> {
     let menu = scrape_menu().await?;
+    insert_static_extras(conn).await?;
     update_menu(conn, menu).await?;
     Ok(())
 }

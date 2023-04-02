@@ -113,12 +113,6 @@ async fn get_menu_day(day: web::Path<u8>, data: web::Data<AppState>) -> MenuResu
     get_menu(&data.conn, day).await
 }
 
-async fn init(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
-    let menu = scrape_menu().await?;
-    update_menu(&data.conn, menu).await?;
-    Ok("saved to db")
-}
-
 #[get("/last-update")]
 async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let date: DateTime<Utc> = menu_info::Entity::find()
@@ -131,4 +125,11 @@ async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, S
         .unwrap();
 
     Ok(serde_json::json!({ "lastUpdate": date }).to_string())
+}
+
+#[get("/update")]
+async fn update(data: web::Data<AppState>) -> Result<String, ServiceError> {
+    let menu = scrape_menu().await?;
+    update_menu(&data.conn, menu).await?;
+    Ok("Success".into())
 }
