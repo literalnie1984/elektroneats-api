@@ -77,6 +77,7 @@ async fn main() -> std::io::Result<()> {
                     .service(change_password)
                     .service(get_delete_mail)
                     .service(delete_acc)
+                    .service(resend_activation)
                     .service(
                         web::scope("/orders")
                             .service(create_order)

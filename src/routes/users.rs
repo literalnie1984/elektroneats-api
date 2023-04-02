@@ -244,6 +244,20 @@ async fn register(user: web::Json<UserRegister>, data: web::Data<AppState>) -> i
 struct Email {
     email: String,
 }
+
+#[post("/resend-activation")]
+async fn resend_activation(
+    data: web::Data<AppState>,
+    email: web::Json<Email>,
+) -> Result<String, ServiceError> {
+    send_verification_mail(
+        &email.email,
+        &data.activators_reg,
+        VerificationType::Register,
+    )
+    .await
+}
+
 #[post("/activate/{token}")]
 async fn activate_account(
     token: Path<String>,
