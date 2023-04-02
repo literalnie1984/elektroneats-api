@@ -27,6 +27,8 @@ pub mod jwt_auth;
 pub mod routes;
 pub mod scraper;
 
+const CODE_INTS: [char; 10] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
 pub fn convert_err_to_500<E>(err: E, msg: Option<&str>) -> ServiceError
 where
     E: Display,
@@ -60,12 +62,13 @@ pub async fn send_verification_mail(
         .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
 
     //add email - activation_link combo to current app state
-    let activation_link = nanoid!();
+    let code_len = email_type.code_len();
+    let activation_code = nanoid!(code_len, &CODE_INTS);
     let mail = email_type
-        .email_msg(to, from, &activation_link)
+        .email_msg(to, from, &activation_code)
         .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
     let mut activators = activators.write().await;
-    (*activators).insert(activation_link, email.into());
+    (*activators).insert(activation_code, email.into());
 
     let smtp: AsyncSmtpTransport<AsyncStd1Executor> =
         AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay("mikut.dev")

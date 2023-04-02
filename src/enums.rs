@@ -29,7 +29,7 @@ impl VerificationType {
     pub fn code_len(&self) -> usize {
         match self {
             Self::Register => 4,
-            Self::Delete => 8,
+            Self::Delete => 4,
         }
     }
 }

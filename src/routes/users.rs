@@ -1,7 +1,7 @@
 use std::mem;
 
 use actix_web::web::Path;
-use actix_web::{get, post, web, Responder, put, delete};
+use actix_web::{delete, get, post, put, web, Responder};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -104,9 +104,9 @@ async fn delete_acc(
 ) -> Result<impl Responder, ServiceError> {
     let tokens = data.activators_del.read().await;
     let token = &token.into_inner();
-    let Some(token2) = tokens.get(&user.email) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
+    let Some(email) = tokens.get(token) else {return Err(ServiceError::BadRequest("Invalid deletion token!".into()))};
 
-    if token != token2 {
+    if user.email != *email {
         return Err(ServiceError::BadRequest("Invalid deletion code!".into()));
     }
 
@@ -253,8 +253,8 @@ async fn activate_account(
     let tokens = data.activators_reg.read().await;
     let token = &token.into_inner();
     let email = mem::take(&mut email.email);
-    let Some(token2) = tokens.get(&email) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
-    if token != token2 {
+    let Some(email2) = tokens.get(token) else {return Err(ServiceError::BadRequest("Invalid activation link".into()))};
+    if email != *email2 {
         return Err(ServiceError::BadRequest("Bad activation code".into()));
     }
     let conn = &data.conn;
