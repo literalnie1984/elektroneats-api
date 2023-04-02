@@ -1,7 +1,7 @@
-use std::{mem, collections::HashSet};
+use std::{collections::HashSet, mem};
 
 use actix_web::{get, post, web};
-use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user};
+use entity::{dinner, dinner_orders, extras, extras_order, user, user_dinner_orders};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set};
 
 use crate::{
@@ -9,7 +9,10 @@ use crate::{
     convert_err_to_500,
     errors::ServiceError,
     jwt_auth::AuthUser,
-    routes::structs::{OrderRequest, UserWithOrders, DinnerResponse, OrderResponse, AllUsersOrders, UserOrders}, map_db_err,
+    map_db_err,
+    routes::structs::{
+        AllUsersOrders, DinnerResponse, OrderRequest, OrderResponse, UserOrders, UserWithOrders,
+    },
 };
 
 //TODO: TRANSACTIONS PROBABLY
@@ -105,15 +108,21 @@ async fn get_user_orders(
                 let dinner_id = dinner.id;
                 dinners_out.insert(dinner);
 
-                let mut extras = extras.into_iter().map(|e| {
-                    let id = e.id;
-                    extras_out.insert(e);
-                    id
-                }).collect::<Vec<_>>();
+                let mut extras = extras
+                    .into_iter()
+                    .map(|e| {
+                        let id = e.id;
+                        extras_out.insert(e);
+                        id
+                    })
+                    .collect::<Vec<_>>();
 
-                DinnerResponse{dinner_id: dinner_id, extras_ids: mem::take(&mut extras)}
-            }
-            ).collect::<Vec<_>>();
+                DinnerResponse {
+                    dinner_id: dinner_id,
+                    extras_ids: mem::take(&mut extras),
+                }
+            })
+            .collect::<Vec<_>>();
 
         output.push(OrderResponse {
             collection_date: order.collection_date,
@@ -121,8 +130,8 @@ async fn get_user_orders(
         });
     }
 
-    Ok(web::Json(UserOrders{
-        response: mem::take(&mut output), 
+    Ok(web::Json(UserOrders {
+        response: mem::take(&mut output),
         dinners: mem::take(&mut dinners_out),
         extras: mem::take(&mut extras_out),
     }))
@@ -151,9 +160,14 @@ async fn get_pending_user_orders(
 }
 
 #[get("/pending")]
-async fn get_all_pending_orders(user: AuthUser, data: web::Data<AppState>) -> Result<web::Json<AllUsersOrders>, ServiceError>{
-    if !user.is_admin{
-        return Err(ServiceError::Unauthorized("Only admin can access that data".to_string()));
+async fn get_all_pending_orders(
+    user: AuthUser,
+    data: web::Data<AppState>,
+) -> Result<web::Json<AllUsersOrders>, ServiceError> {
+    if !user.is_admin {
+        return Err(ServiceError::Unauthorized(
+            "Only admin can access that data".to_string(),
+        ));
     }
     let db = &data.conn;
 
@@ -168,52 +182,62 @@ async fn get_all_pending_orders(user: AuthUser, data: web::Data<AppState>) -> Re
     let mut extras_out = HashSet::new();
     let mut output: Vec<UserWithOrders> = Vec::with_capacity(users_with_orders.len());
 
-    for (user, orders) in users_with_orders.iter(){
-        output.push(
-            UserWithOrders{
-                username: user.username.clone(),
-                user_id: user.id,
-                orders: Vec::new(),
-            }
-        );
+    for (user, orders) in users_with_orders.iter() {
+        output.push(UserWithOrders {
+            username: user.username.clone(),
+            user_id: user.id,
+            orders: Vec::new(),
+        });
 
-        let user_dinner_orders = orders.load_many(user_dinner_orders::Entity, db).await.map_err(map_db_err)?;
+        let user_dinner_orders = orders
+            .load_many(user_dinner_orders::Entity, db)
+            .await
+            .map_err(map_db_err)?;
 
         for (user_dinner, order) in user_dinner_orders.iter().zip(orders.iter()) {
+            let dinner = user_dinner
+                .load_one(dinner::Entity, db)
+                .await
+                .map_err(map_db_err)?;
+            let extras = user_dinner
+                .load_many_to_many(extras::Entity, extras_order::Entity, db)
+                .await
+                .map_err(map_db_err)?;
 
-            let dinner = user_dinner.load_one(dinner::Entity, db).await.map_err(map_db_err)?;
-            let extras = user_dinner.load_many_to_many(extras::Entity, extras_order::Entity, db).await.map_err(map_db_err)?;
-
-            let mut dinners_with_extras = dinner.into_iter().zip(extras.into_iter()).map(
-                |(dinner, extras)| {
-
+            let mut dinners_with_extras = dinner
+                .into_iter()
+                .zip(extras.into_iter())
+                .map(|(dinner, extras)| {
                     let dinner = dinner.unwrap();
                     let dinner_id = dinner.id;
                     dinners_out.insert(dinner);
 
-                    let mut extras = extras.into_iter().map(|e| {
-                        let id = e.id;
-                        extras_out.insert(e);
-                        id
-                    }).collect::<Vec<_>>();
+                    let mut extras = extras
+                        .into_iter()
+                        .map(|e| {
+                            let id = e.id;
+                            extras_out.insert(e);
+                            id
+                        })
+                        .collect::<Vec<_>>();
 
-                    DinnerResponse{dinner_id: dinner_id, extras_ids: mem::take(&mut extras)}
-                }
-            ).collect::<Vec<_>>();
+                    DinnerResponse {
+                        dinner_id,
+                        extras_ids: mem::take(&mut extras),
+                    }
+                })
+                .collect::<Vec<_>>();
 
-            output.last_mut().unwrap().orders.push(
-                OrderResponse {
-                    collection_date: order.collection_date,
-                    dinners: mem::take(&mut dinners_with_extras),
-                }
-            );
+            output.last_mut().unwrap().orders.push(OrderResponse {
+                collection_date: order.collection_date,
+                dinners: mem::take(&mut dinners_with_extras),
+            });
         }
     }
 
-
-    Ok(web::Json(AllUsersOrders{
-        response: mem::take(&mut output), 
+    Ok(web::Json(AllUsersOrders {
+        response: mem::take(&mut output),
         dinners: mem::take(&mut dinners_out),
-        extras: mem::take(&mut extras_out)
+        extras: mem::take(&mut extras_out),
     }))
 }

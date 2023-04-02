@@ -155,7 +155,7 @@ pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
     let correct_menu = weekly_menu
         .iter_mut()
         .enumerate()
-        .filter(|(_, menu)| menu.dishes != ["NIECZYNNE"])
+        .filter(|(_, menu)| menu.dishes != ["NIECZYNNE"] && !menu.dishes.is_empty())
         .map(|(day, menu)| (day as u8, std::mem::take(menu)))
         .collect();
 
@@ -218,12 +218,12 @@ pub async fn update_menu(
             .dishes
             .iter_mut()
             .map(|mut dish| dinner::ActiveModel {
+                image: Set(format!("d{}.jpg", dish.replace(" ", ""))),
                 name: Set(take(&mut dish)),
                 r#type: Set(entity::sea_orm_active_enums::Type::Main),
                 week_day: Set(*day),
                 max_supply: Set(15),
                 price: Set(Decimal::new(15, 0)),
-                image: Set("TODO".into()),
                 ..Default::default()
             })
             .collect();
@@ -237,9 +237,9 @@ pub async fn update_menu(
         let additional = {
             if let Some(other_extra) = menu.extras.clone() {
                 let res = extras::Entity::insert(extras::ActiveModel {
+                    image: Set(format!("e{}.jpg", other_extra.replace(" ", ""))),
                     name: Set(other_extra),
                     price: Set(Decimal::new(10, 1)),
-                    image: Set("TODO".into()),
                     r#type: Set(entity::sea_orm_active_enums::ExtrasType::Filler),
                     ..Default::default()
                 })
