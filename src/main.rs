@@ -61,7 +61,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let logger = Logger::default();
-        let cors = Cors::new();
+        let cors = Cors::permissive();
         // let cors = Cors::default()
         //     .allow_any_origin()
         //     .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
