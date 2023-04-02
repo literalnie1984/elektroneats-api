@@ -1,13 +1,13 @@
 use std::mem;
 
 use actix_web::{get, web, Responder};
-use chrono::Datelike;
+use chrono::{Datelike, DateTime, Utc};
 use entity::{
     dinner,
-    prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras,
+    prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras, menu_info,
 };
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder,
+    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use sea_orm::ModelTrait;
 
@@ -117,4 +117,16 @@ async fn update(data: web::Data<AppState>) -> Result<impl Responder, ServiceErro
     let menu = scrape_menu().await?;
     update_menu(&data.conn, menu).await?;
     Ok("saved to db")
+}
+
+#[get("/last-update")]
+async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
+    let (date): (DateTime<Utc>) = menu_info::Entity::find()
+    .select_only()
+    .column(menu_info::Column::LastUpdate)
+    .into_tuple()
+    .one(&data.conn)
+    .await.map_err(map_db_err)?.unwrap();
+
+    Ok(serde_json::json!({ "lastUpdate": date }).to_string())
 }

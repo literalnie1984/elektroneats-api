@@ -1,6 +1,6 @@
 use sea_orm::{Related, RelationDef, RelationTrait, Linked};
 
-use crate::{dinner, extras, extras_dinner, user, dinner_orders, user_dinner_orders};
+use crate::{dinner, extras, extras_dinner, dinner_orders, user_dinner_orders};
 
 impl Related<crate::extras::Entity> for crate::dinner::Entity {
     fn to() -> RelationDef {

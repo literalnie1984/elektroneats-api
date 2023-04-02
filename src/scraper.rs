@@ -1,9 +1,10 @@
 use std::{mem::take, vec};
 
 use actix_web::web;
-use entity::{dinner, extras, extras_dinner};
+use entity::{dinner, extras, extras_dinner, menu_info};
+use log::info;
 use scraper::{Html, Selector};
-use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set, ActiveValue::NotSet, ActiveModelTrait, Unchanged};
 use serde::Serialize;
 
 use crate::{convert_err_to_500, errors::ServiceError, map_db_err};
@@ -268,11 +269,25 @@ pub async fn update_menu(
 
         prev_last_insert_id = curr_last + 2;
     }
-
+    info!("{:#?}", extras_dinners_all); //SOME SCRAPING PROBLEM
     extras_dinner::Entity::insert_many(extras_dinners_all)
         .exec(conn)
         .await
         .map_err(map_db_err)?;
+
+    //last menu update date
+    let menu_info_model = menu_info::ActiveModel{
+        id: Set(1),
+        last_update: Set(chrono::offset::Utc::now())
+    };
+
+    menu_info::Entity::insert(menu_info_model)
+    .on_conflict(
+        sea_orm::sea_query::OnConflict::column(menu_info::Column::LastUpdate)
+            .update_column(menu_info::Column::LastUpdate)
+            .to_owned()
+    )
+    .exec(conn).await.map_err(map_db_err)?;
 
     Ok(())
 }

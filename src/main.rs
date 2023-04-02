@@ -1,4 +1,3 @@
-use actix_web::dev::Service;
 use actix_web::http::header;
 use async_std::sync::RwLock;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
@@ -84,6 +83,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_menu_all)
                     .service(get_menu_today)
                     .service(get_menu_day)
+                    .service(last_menu_update)
                     .service(update),
             );
         App::new()

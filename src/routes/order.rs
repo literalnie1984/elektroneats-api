@@ -2,7 +2,6 @@ use std::{mem, collections::{HashSet, HashMap}};
 
 use actix_web::{get, post, web};
 use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user};
-use log::info;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -52,8 +51,8 @@ async fn create_order(
     let extras: HashMap<_, _>= extras.into_iter().collect();
 
     let price: i64 = 
-    dinner_ids.into_iter().map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 1000f64) as i64).sum::<i64>() +
-    extras_ids.into_iter().map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 1000f64) as i64).sum::<i64>();
+    dinner_ids.into_iter().map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>() +
+    extras_ids.into_iter().map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>();
     
     let customer = get_user(db, user.id, &data.stripe_client.0).await?;
     let balance = customer.balance.unwrap();
