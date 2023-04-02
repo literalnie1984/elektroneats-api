@@ -8,8 +8,8 @@ use serde::Serialize;
 
 use crate::{convert_err_to_500, errors::ServiceError, map_db_err};
 
-const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
-const TWO_PARTS_DISHES_PREFIXES: [&'static str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
+const MENU_URL: &str = "https://zse.edu.pl/kantyna/";
+const TWO_PARTS_DISHES_PREFIXES: [&str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct MenuDay {
@@ -65,7 +65,7 @@ fn vec_to_menu(mut vec: Vec<Vec<String>>) -> Vec<MenuDay> {
                 .any(|bl| bl)
             {
                 if let Some(last_dish) = menu_days[idx].dishes.last_mut() {
-                    last_dish.push_str(" ");
+                    last_dish.push(' ');
                     last_dish.push_str(curr_dish);
                 }
             } else {
@@ -81,7 +81,7 @@ fn vec_to_menu(mut vec: Vec<Vec<String>>) -> Vec<MenuDay> {
     {
         for idx in 0..3 {
             //extras usually is ziemniaki but can be ziemniaki / X, if so save X
-            let mut extra = extras[idx].splitn(2, "/");
+            let mut extra = extras[idx].splitn(2, '/');
             if let Some(extra) = extra.nth(1) {
                 menu_days[idx].extras = Some(trim_whitespace(extra));
             } else {
@@ -105,7 +105,7 @@ fn trim_whitespace(s: &str) -> String {
     owned
 }
 
-fn remove_spaces_and_utf8<'r>(s: &'r str) -> String {
+fn remove_spaces_and_utf8(s: &str) -> String {
     s.replace(|c: char| !c.is_ascii() || c == ' ', "")
 }
 
@@ -131,7 +131,6 @@ pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
     }) {
         let mut vec: Vec<_> = row
             .select(&td_selector)
-            .into_iter()
             .map(|td| td.text().map(trim_whitespace).collect::<String>())
             .collect();
 
@@ -142,7 +141,7 @@ pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
         if is_wed {
             thu_to_sat.push(vec);
         } else {
-            if let Some(txt) = vec.iter().nth(0) {
+            if let Some(txt) = vec.get(0) {
                 if txt == "CZWARTEK" {
                     is_wed = true;
                     continue;
@@ -184,7 +183,7 @@ pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), Servi
         },
         extras::ActiveModel {
             name: Set("kompot".into()),
-            price: Set(Decimal::new(05, 1)),
+            price: Set(Decimal::new(5, 1)),
             image: Set("ekompot".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Beverage),
             ..Default::default()
@@ -233,9 +232,9 @@ pub async fn update_menu(
         let mut dinners: Vec<_> = menu
             .dishes
             .iter_mut()
-            .map(|mut dish| dinner::ActiveModel {
-                image: Set(format!("d{}.jpg", remove_spaces_and_utf8(&dish))),
-                name: Set(take(&mut dish)),
+            .map(|dish| dinner::ActiveModel {
+                image: Set(format!("d{}.jpg", remove_spaces_and_utf8(dish))),
+                name: Set(take(dish)),
                 r#type: Set(entity::sea_orm_active_enums::Type::Main),
                 week_day: Set(*day),
                 max_supply: Set(15),

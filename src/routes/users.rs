@@ -55,7 +55,7 @@ async fn change_password(
         Ok(_) => Ok("Password changed".to_string()),
         Err(error) => {
             error!("Database error: {}", error);
-            return Err(ServiceError::InternalError);
+            Err(ServiceError::InternalError)
         }
     }
 }

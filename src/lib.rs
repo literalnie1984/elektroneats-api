@@ -72,9 +72,7 @@ pub async fn send_verification_mail(
             .unwrap()
             .credentials(Credentials::new(
                 "kantyna.noreply@mikut.dev".to_owned(),
-                dotenvy::var("EMAIL_PASS")
-                    .expect("NO EMAIL_PASS val provided in .env")
-                    .to_string(),
+                dotenvy::var("EMAIL_PASS").expect("NO EMAIL_PASS val provided in .env"),
             ))
             .authentication(vec![Mechanism::Plain])
             .pool_config(PoolConfig::new().max_size(20))

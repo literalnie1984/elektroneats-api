@@ -108,7 +108,7 @@ async fn get_menu_today(data: web::Data<AppState>) -> MenuResult {
 
 #[get("/day/{day:[0-9]}")]
 async fn get_menu_day(day: web::Path<u8>, data: web::Data<AppState>) -> MenuResult {
-    let day = day.into_inner().min(5) as u8;
+    let day = day.into_inner().min(5);
 
     get_menu(&data.conn, day).await
 }

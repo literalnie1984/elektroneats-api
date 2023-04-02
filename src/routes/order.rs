@@ -37,8 +37,7 @@ async fn create_order(
     let _extras_ids = order
         .dinners
         .iter()
-        .map(|x| x.extras_ids.clone())
-        .flatten()
+        .flat_map(|x| x.extras_ids.clone())
         .collect::<Vec<_>>();
 
     // let dinners:Vec<(i32, Decimal)> = dinner::Entity::find()
