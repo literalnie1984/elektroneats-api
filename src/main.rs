@@ -1,3 +1,4 @@
+use actix_web::dev::Service;
 use actix_web::http::header;
 use async_std::sync::RwLock;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
@@ -52,12 +53,22 @@ async fn main() -> std::io::Result<()> {
                     .service(get_user_data)
                     .service(change_password)
                     .service(get_delete_mail)
-                    .service(delete_acc),
+                    .service(delete_acc)
+                    .service(
+                        web::scope("/orders")
+                            .service(create_order)
+                            .service(get_completed_user_orders)
+                            .service(get_pending_user_orders)
+                    ),
             )
             .service(
                 web::scope("/admin")
                     .service(update_dish)
-                    .service(claim_order),
+                    .service(
+                        web::scope("/orders")
+                            .service(get_all_pending_orders)
+                            .service(claim_order)
+                    ),
             )
             .service(
                 web::scope("/payment")
@@ -67,13 +78,6 @@ async fn main() -> std::io::Result<()> {
                     .service(customer_details)
                     // .service(test_balance)
                     .service(received_payment),
-            )
-            .service(
-                web::scope("/orders")
-                    .service(create_order)
-                    .service(get_completed_user_orders)
-                    .service(get_all_orders)
-                    .service(get_pending_user_orders),
             )
             .service(
                 web::scope("/menu")

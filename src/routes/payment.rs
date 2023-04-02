@@ -15,7 +15,7 @@ use crate::{
 
 use super::structs::{AddReturn, StripeUser};
 
-#[post("/add_balance/{amount:[0-9]+}")]
+#[post("/add-balance/{amount:[0-9]+}")]
 async fn add_balance(
     data: web::Data<AppState>,
     amount: web::Path<i64>,
@@ -118,11 +118,11 @@ async fn init_wallet(
     data: web::Data<AppState>,
     mut stripe_data: web::Json<StripeUser>,
 ) -> Result<String, ServiceError> {
-    /* if !user.is_validate {
+    if !user.is_verified {
         return Err(ServiceError::BadRequest(
             "Your account must be validated before initializing wallet".into(),
         ));
-    } */
+    }
 
     let client = &data.stripe_client.0;
     let conn = &data.conn;

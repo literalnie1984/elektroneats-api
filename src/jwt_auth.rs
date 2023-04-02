@@ -16,6 +16,7 @@ pub struct AuthUser {
     pub username: String,
     pub email: String,
     pub is_admin: bool,
+    pub is_verified: bool,
 }   
 
 impl FromRequest for AuthUser {
@@ -71,17 +72,19 @@ pub struct AccessTokenClaims {
     username: String,
     email: String,
     is_admin: bool,
+    is_verified: bool,
     exp: usize,
 }
 
 impl AccessTokenClaims{
-    pub fn new(id: i32, username: &str, email: &str, is_admin: i8, exp_seconds: i64) -> Self{
+    pub fn new(id: i32, username: &str, email: &str, is_admin: i8, is_verified: bool, exp_seconds: i64) -> Self{
         Self{
             sub: id.to_string(),
             username: username.to_string(),
             email: email.to_string(),
             is_admin: is_admin == 1,
-            exp: get_expiration(exp_seconds)
+            exp: get_expiration(exp_seconds),
+            is_verified: is_verified
         }
     }
 }
@@ -105,6 +108,7 @@ fn decode_access_token(token: String) -> Result<AuthUser, ServiceError> {
         is_admin: decoded.claims.is_admin,
         username: decoded.claims.username,
         email: decoded.claims.email,
+        is_verified: decoded.claims.is_verified
     })
 }
 
