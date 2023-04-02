@@ -2,7 +2,10 @@ use actix_files::Files;
 use actix_web::dev::Service;
 use actix_web::http::header;
 use async_std::sync::RwLock;
+use kantyna_api::errors::ServiceError;
+use kantyna_api::init_db;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
+use log::error;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -15,6 +18,7 @@ use kantyna_api::appstate::{AppState, ClientWrapper};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    //turn on logger if compiled in debug
     if cfg!(debug_assertions) {
         std::env::set_var("RUST_LOG", "info");
         std::env::set_var("RUST_BACKTRACE", "1");
@@ -27,7 +31,26 @@ async fn main() -> std::io::Result<()> {
         dotenvy::var("STRIPE_SECRET").expect("STRIPE_SECRET is not set in .env file");
     let stripe_client = ClientWrapper::new(&stripe_secret);
 
+    //establish db connection
     let connection = sea_orm::Database::connect(&db_url).await.unwrap();
+
+    //handle args
+    if let Some(arg) = std::env::args().nth(1) {
+        let arg: &str = &arg;
+        match arg {
+            "initdb" => {
+                Migrator::fresh(&connection).await.unwrap();
+                init_db(&connection).await.map_err(|e| {
+                    error!("Error during db init: {}", e);
+                    std::io::Error::new(std::io::ErrorKind::Other, "DB init err")
+                })?;
+                eprintln!("DB init successful");
+                return Ok(());
+            }
+            _ => panic!("arg not supported"),
+        }
+    }
+
     Migrator::up(&connection, None).await.unwrap();
 
     //create outside of closure so workers can share state
@@ -84,8 +107,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_menu_all)
                     .service(get_menu_today)
                     .service(get_menu_day)
-                    .service(last_menu_update)
-                    .service(update),
+                    .service(last_menu_update),
             );
         App::new()
             .wrap(logger)

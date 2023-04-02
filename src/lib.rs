@@ -1,3 +1,4 @@
+use crate::scraper::{scrape_menu, update_menu};
 use actix_web::HttpRequest;
 use appstate::ActivatorsVec;
 use entity::prelude::User;
@@ -139,4 +140,10 @@ pub async fn get_user(
             "Stripe wasn't initialized for provided user".into(),
         ))
     }
+}
+
+pub async fn init_db(conn: &DatabaseConnection) -> Result<(), ServiceError> {
+    let menu = scrape_menu().await?;
+    update_menu(conn, menu).await?;
+    Ok(())
 }
