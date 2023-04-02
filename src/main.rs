@@ -117,7 +117,7 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/admin", "./static/admin").index_file("index.html"))
         // .service(Files::new("/", "./static/kantyna").index_file("index.html"))
     })
-    .bind(("127.0.0.1", 4765))? //arbitrary port used
+    .bind(("0.0.0.0", 4765))? //arbitrary port used
     .run()
     .await
 }
