@@ -3,8 +3,9 @@ use std::mem;
 use actix_web::{get, web, Responder};
 use chrono::{Datelike, DateTime, Utc};
 use entity::{
+    custom_impl::DinnerToExtras,
     dinner,
-    prelude::{Dinner, Extras, ExtrasDinner}, custom_impl::DinnerToExtras, menu_info,
+    prelude::{Dinner, Extras, ExtrasDinner},  menu_info,
 };
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder, QuerySelect,

@@ -25,6 +25,7 @@ actix-cors = "0.6.4"
 rustls = "0.20.8"
 async-stripe = { version = "0.18.4", features = ["runtime-tokio-hyper-rustls"] }
 rust_decimal = "1.29.1"
+actix-files = "0.6.2"
 
 [dependencies.sea-orm]
 version = "0.11.0" # sea-orm version

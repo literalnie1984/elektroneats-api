@@ -1,3 +1,5 @@
+use actix_files::Files;
+use actix_web::dev::Service;
 use actix_web::http::header;
 use async_std::sync::RwLock;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
@@ -44,6 +46,7 @@ async fn main() -> std::io::Result<()> {
             .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE]);
 
         let routes = web::scope("/api")
+            .service(Files::new("/image", "./images"))
             .service(
                 web::scope("/user")
                     .service(login)
@@ -57,17 +60,15 @@ async fn main() -> std::io::Result<()> {
                         web::scope("/orders")
                             .service(create_order)
                             .service(get_completed_user_orders)
-                            .service(get_pending_user_orders)
+                            .service(get_pending_user_orders),
                     ),
             )
             .service(
-                web::scope("/admin")
-                    .service(update_dish)
-                    .service(
-                        web::scope("/orders")
-                            .service(get_all_pending_orders)
-                            .service(claim_order)
-                    ),
+                web::scope("/admin").service(update_dish).service(
+                    web::scope("/orders")
+                        .service(get_all_pending_orders)
+                        .service(claim_order),
+                ),
             )
             .service(
                 web::scope("/payment")
