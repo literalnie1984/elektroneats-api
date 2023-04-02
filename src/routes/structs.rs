@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use chrono::serde::ts_seconds;
 use chrono::{DateTime, Utc};
+use entity::model_enums::Status;
 use entity::{dinner, extras};
 use serde::{Deserialize, Serialize};
 
@@ -90,15 +91,16 @@ pub struct DinnerResponse {
     pub extras_ids: Vec<i32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderResponse {
     #[serde(with = "ts_seconds")]
     pub collection_date: DateTime<Utc>,
+    pub status: Status,
     pub dinners: Vec<DinnerResponse>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 pub struct UserWithOrders {
     pub user_id: i32,
     pub username: String,
