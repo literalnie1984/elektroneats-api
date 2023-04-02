@@ -1,17 +1,20 @@
-use std::{mem, collections::{HashSet, HashMap}};
+use std::{collections::HashSet, mem};
 
 use actix_web::{get, post, web};
-use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user, model_enums::Status};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
-use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
+use entity::{
+    dinner, dinner_orders, extras, extras_order, model_enums::Status, user, user_dinner_orders,
+};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set};
 
 use crate::{
     appstate::AppState,
     convert_err_to_500,
     errors::ServiceError,
     jwt_auth::AuthUser,
-    routes::structs::{OrderRequest, UserWithOrders, DinnerResponse, OrderResponse, AllUsersOrders, UserOrders}, map_db_err, get_user, pay,
+    map_db_err,
+    routes::structs::{
+        AllUsersOrders, DinnerResponse, OrderRequest, OrderResponse, UserOrders, UserWithOrders,
+    },
 };
 
 //TODO: TRANSACTIONS PROBABLY
@@ -25,11 +28,18 @@ async fn create_order(
     let order = order.into_inner();
     let user_id = user.id;
 
-    let dinner_ids = 
-    order.dinners.iter().map(|x| x.dinner_id).collect::<Vec<_>>();
+    let _dinner_ids = order
+        .dinners
+        .iter()
+        .map(|x| x.dinner_id)
+        .collect::<Vec<_>>();
 
-    let extras_ids = 
-    order.dinners.iter().map(|x| x.extras_ids.clone()).flatten().collect::<Vec<_>>();
+    let _extras_ids = order
+        .dinners
+        .iter()
+        .map(|x| x.extras_ids.clone())
+        .flatten()
+        .collect::<Vec<_>>();
 
     // let dinners:Vec<(i32, Decimal)> = dinner::Entity::find()
     //     .filter(dinner::Column::Id.is_in(dinner_ids.clone()))
@@ -50,10 +60,10 @@ async fn create_order(
     // let dinners: HashMap<_, _>= dinners.into_iter().collect();
     // let extras: HashMap<_, _>= extras.into_iter().collect();
 
-    // let price: i64 = 
+    // let price: i64 =
     // dinner_ids.into_iter().map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>() +
     // extras_ids.into_iter().map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>();
-    
+
     // let customer = get_user(db, user.id, &data.stripe_client.0).await?;
     // let balance = customer.balance.unwrap();
     // if balance < price{
@@ -113,7 +123,11 @@ async fn get_user_orders(
     let db_err = |err| convert_err_to_500(err, Some("Database error getting user orders"));
     let orders = dinner_orders::Entity::find()
         .filter(dinner_orders::Column::UserId.eq(user_id))
-        .filter(if completed {dinner_orders::Column::UserId.eq(Status::Collected)} else {dinner_orders::Column::UserId.ne(Status::Collected)})
+        .filter(if completed {
+            dinner_orders::Column::UserId.eq(Status::Collected)
+        } else {
+            dinner_orders::Column::UserId.ne(Status::Collected)
+        })
         .all(db)
         .await
         .map_err(db_err)?;
@@ -153,7 +167,7 @@ async fn get_user_orders(
                     .collect::<Vec<_>>();
 
                 DinnerResponse {
-                    dinner_id: dinner_id,
+                    dinner_id,
                     extras_ids: mem::take(&mut extras),
                 }
             })
@@ -161,7 +175,7 @@ async fn get_user_orders(
 
         output.push(OrderResponse {
             collection_date: order.collection_date,
-            status:  Status::from_repr(order.status).unwrap(),
+            status: Status::from_repr(order.status).unwrap(),
             dinners: mem::take(&mut dinners_with_extras),
         });
     }
@@ -266,7 +280,7 @@ async fn get_all_pending_orders(
 
             output.last_mut().unwrap().orders.push(OrderResponse {
                 collection_date: order.collection_date,
-                status:  Status::from_repr(order.status).unwrap(),
+                status: Status::from_repr(order.status).unwrap(),
                 dinners: mem::take(&mut dinners_with_extras),
             });
         }

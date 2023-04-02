@@ -2,12 +2,8 @@ use std::{mem::take, vec};
 
 use actix_web::web;
 use entity::{dinner, extras, extras_dinner, menu_info, prelude::Dinner};
-use log::info;
 use scraper::{Html, Selector};
-use sea_orm::{
-    prelude::Decimal, ActiveModelTrait, ActiveValue::NotSet, DatabaseConnection, EntityTrait,
-    QueryOrder, QuerySelect, QueryTrait, Set, Unchanged,
-};
+use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, QueryOrder, Set};
 use serde::Serialize;
 
 use crate::{convert_err_to_500, errors::ServiceError, map_db_err};

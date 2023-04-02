@@ -1,7 +1,6 @@
 use actix_web::{get, post, web, HttpRequest};
 use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
-use serde::Serialize;
 use std::{borrow::Borrow, collections::HashMap, mem};
 use stripe::{
     self, CreateCustomer, CreatePaymentIntent, Customer, EventObject, EventType, PaymentIntent,
