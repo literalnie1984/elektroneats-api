@@ -3,11 +3,12 @@ use entity::{
     dinner, dinner_orders,
     prelude::{Dinner, DinnerOrders},
 };
-use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set, ActiveEnum};
+use sea_orm::{prelude::Decimal, ActiveEnum, ActiveModelTrait, EntityTrait, Set};
 use std::mem;
 
 use crate::{
-    appstate::AppState, errors::ServiceError, jwt_auth::AuthUser, map_db_err, update_if_some, routes::structs::OrderStatusRequest,
+    appstate::AppState, errors::ServiceError, jwt_auth::AuthUser, map_db_err,
+    routes::structs::OrderStatusRequest, update_if_some,
 };
 
 use super::structs::UpdateMenu;
@@ -57,7 +58,7 @@ async fn change_order_status(
     user: AuthUser,
     path: web::Path<i32>,
     data: web::Data<AppState>,
-    body: web::Json<OrderStatusRequest>
+    body: web::Json<OrderStatusRequest>,
 ) -> Result<String, ServiceError> {
     if !user.is_admin {
         return Err(ServiceError::Unauthorized(

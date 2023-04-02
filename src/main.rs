@@ -1,5 +1,4 @@
 use actix_files::Files;
-use actix_web::http::header;
 use async_std::sync::RwLock;
 use kantyna_api::init_db;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
@@ -114,6 +113,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(state.clone())
             .service(routes)
+            .service(Files::new("/admin", "./static/admin").index_file("index.html"))
+        // .service(Files::new("/", "./static/kantyna").index_file("index.html"))
     })
     .bind(("127.0.0.1", 4765))? //arbitrary port used
     .run()
