@@ -165,21 +165,21 @@ pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
 pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), ServiceError> {
     let static_extras = vec![
         extras::ActiveModel {
-            name: Set("Ziemniaki".into()),
+            name: Set("ziemniaki".into()),
             price: Set(Decimal::new(10, 1)),
             image: Set("TODO".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Filler),
             ..Default::default()
         },
         extras::ActiveModel {
-            name: Set("Surówka".into()),
+            name: Set("surówka".into()),
             price: Set(Decimal::new(10, 1)),
             image: Set("TODO".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Salad),
             ..Default::default()
         },
         extras::ActiveModel {
-            name: Set("Kompot".into()),
+            name: Set("kompot".into()),
             price: Set(Decimal::new(05, 1)),
             image: Set("TODO".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Beverage),
