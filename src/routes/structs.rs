@@ -83,6 +83,13 @@ pub struct Dinner {
     pub extras_ids: Vec<i32>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LastUpdateResponse{
+    #[serde(with = "ts_seconds")]
+    pub last_update: DateTime<Utc>
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderStatusRequest {
