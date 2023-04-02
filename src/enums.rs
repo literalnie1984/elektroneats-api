@@ -17,7 +17,10 @@ impl VerificationType {
                 .from(from)
                 .to(to)
                 .subject("Twój kod do kantyny")
-                .body(format!("Wpisz ten kod aby aktywowć konto: {}", code)),
+                .body(format!(
+                    "Kod na potwierdzenie aktywowania konta w kantynie: {}",
+                    code
+                )),
             Self::Delete => Message::builder()
                 .from(from)
                 .to(to)
