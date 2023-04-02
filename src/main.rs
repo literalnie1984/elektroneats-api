@@ -84,6 +84,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_menu_all)
                     .service(get_menu_today)
                     .service(get_menu_day)
+                    .service(last_menu_update)
                     .service(update),
             );
         App::new()

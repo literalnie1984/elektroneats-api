@@ -1,9 +1,9 @@
 use actix_web::{get, put, web};
 use entity::{
     dinner, dinner_orders,
-    prelude::{Dinner, DinnerOrders},
+    prelude::{Dinner, DinnerOrders}, model_enums::Status,
 };
-use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set};
+use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set, ActiveEnum};
 use std::mem;
 
 use crate::{
@@ -73,7 +73,7 @@ async fn claim_order(
             .await
             .map_err(map_db_err)?;
         let Some(order) = order else {return Err(ServiceError::BadRequest("Invalid dinner_order id".into()))};
-        if order.completed == 1 {
+        if order.status == Status::Collected.into_value() {
             return Err(ServiceError::BadRequest(
                 "This order has already been claimed".into(),
             ));
@@ -82,7 +82,7 @@ async fn claim_order(
     };
 
     //MySQL has no bools
-    order.completed = Set(1);
+    order.status = Set(Status::Collected.into_value());
     order.update(conn).await.map_err(map_db_err)?;
 
     Ok("Success".into())

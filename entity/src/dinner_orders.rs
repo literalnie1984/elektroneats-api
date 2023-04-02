@@ -9,7 +9,7 @@ pub struct Model {
     pub id: i32,
     pub user_id: i32,
     pub collection_date: DateTimeUtc,
-    pub completed: i8,
+    pub status: u8,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

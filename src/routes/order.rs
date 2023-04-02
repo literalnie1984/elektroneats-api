@@ -1,18 +1,17 @@
-use std::{collections::HashSet, mem};
+use std::{mem, collections::{HashSet, HashMap}};
 
 use actix_web::{get, post, web};
-use entity::{dinner, dinner_orders, extras, extras_order, user, user_dinner_orders};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set};
+use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user, model_enums::Status};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 use crate::{
     appstate::AppState,
     convert_err_to_500,
     errors::ServiceError,
     jwt_auth::AuthUser,
-    map_db_err,
-    routes::structs::{
-        AllUsersOrders, DinnerResponse, OrderRequest, OrderResponse, UserOrders, UserWithOrders,
-    },
+    routes::structs::{OrderRequest, UserWithOrders, DinnerResponse, OrderResponse, AllUsersOrders, UserOrders}, map_db_err, get_user, pay,
 };
 
 //TODO: TRANSACTIONS PROBABLY
@@ -25,6 +24,41 @@ async fn create_order(
     let db = &data.conn;
     let order = order.into_inner();
     let user_id = user.id;
+
+    let dinner_ids = 
+    order.dinners.iter().map(|x| x.dinner_id).collect::<Vec<_>>();
+
+    let extras_ids = 
+    order.dinners.iter().map(|x| x.extras_ids.clone()).flatten().collect::<Vec<_>>();
+
+    let dinners:Vec<(i32, Decimal)> = dinner::Entity::find()
+        .filter(dinner::Column::Id.is_in(dinner_ids.clone()))
+        .select_only()
+        .column(dinner::Column::Id)
+        .column(dinner::Column::Price)
+        .into_tuple()
+        .all(db)
+        .await.map_err(map_db_err)?;
+    let extras:Vec<(i32, Decimal)> = extras::Entity::find()
+        .filter(extras::Column::Id.is_in(extras_ids.clone()))
+        .select_only()
+        .column(extras::Column::Id)
+        .column(extras::Column::Price)
+        .into_tuple()
+        .all(db)
+        .await.map_err(map_db_err)?;
+    let dinners: HashMap<_, _>= dinners.into_iter().collect();
+    let extras: HashMap<_, _>= extras.into_iter().collect();
+
+    let price: i64 = 
+    dinner_ids.into_iter().map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>() +
+    extras_ids.into_iter().map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>();
+    
+    let customer = get_user(db, user.id, &data.stripe_client.0).await?;
+    let balance = customer.balance.unwrap();
+    if balance < price{
+        return Err(ServiceError::BadRequest("Not enough money".to_string()));
+    }
 
     let dinner_order = dinner_orders::ActiveModel {
         user_id: Set(user_id),
@@ -67,18 +101,19 @@ async fn create_order(
             .map_err(|e| convert_err_to_500(e, Some("Database error creating extras_order: {}")))?;
     }
 
+    pay(&data.stripe_client.0, db, user, price).await?;
     Ok("Order created successfully".to_string())
 }
 
 async fn get_user_orders(
     user_id: i32,
     db: &DatabaseConnection,
-    realized: i8,
+    completed: bool,
 ) -> Result<web::Json<UserOrders>, ServiceError> {
     let db_err = |err| convert_err_to_500(err, Some("Database error getting user orders"));
     let orders = dinner_orders::Entity::find()
         .filter(dinner_orders::Column::UserId.eq(user_id))
-        .filter(dinner_orders::Column::Completed.eq(realized))
+        .filter(if completed {dinner_orders::Column::UserId.eq(Status::Collected)} else {dinner_orders::Column::UserId.ne(Status::Collected)})
         .all(db)
         .await
         .map_err(db_err)?;
@@ -145,7 +180,7 @@ async fn get_completed_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, 1).await
+    get_user_orders(user_id, db, true).await
 }
 
 #[get("/pending")]
@@ -156,7 +191,7 @@ async fn get_pending_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, 0).await
+    get_user_orders(user_id, db, false).await
 }
 
 #[get("/pending")]
@@ -173,7 +208,7 @@ async fn get_all_pending_orders(
 
     let users_with_orders = user::Entity::find()
         .find_with_related(dinner_orders::Entity)
-        .filter(dinner_orders::Column::Completed.eq(0))
+        .filter(dinner_orders::Column::Status.ne(Status::Collected))
         .all(db)
         .await
         .map_err(map_db_err)?;

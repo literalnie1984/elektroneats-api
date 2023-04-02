@@ -13,3 +13,4 @@ pub mod shop;
 pub mod shop_orders;
 pub mod user;
 pub mod user_dinner_orders;
+pub mod menu_info;

@@ -1,4 +1,4 @@
-use sea_orm_migration::prelude::*;
+use sea_orm_migration::{prelude::*, sea_orm::{EnumIter, Iterable}};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -30,12 +30,7 @@ impl MigrationTrait for Migration {
                             .timestamp()
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(DinnerOrders::Completed)
-                            .boolean()
-                            .not_null()
-                            .default(false),
-                    )
+                    .col(ColumnDef::new(DinnerOrders::Status).tiny_unsigned().not_null())
                     /* .col(
                         ColumnDef::new(DinnerOrders::CollectionCode)
                             .integer()
@@ -61,6 +56,6 @@ enum DinnerOrders {
     Id,
     UserId,
     CollectionDate,
-    Completed,
+    Status,
     // CollectionCode,
 }
