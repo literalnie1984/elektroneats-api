@@ -17,7 +17,7 @@ pub struct AuthUser {
     pub email: String,
     pub is_admin: bool,
     pub is_verified: bool,
-}   
+}
 
 impl FromRequest for AuthUser {
     type Error = ServiceError;
@@ -76,15 +76,22 @@ pub struct AccessTokenClaims {
     exp: usize,
 }
 
-impl AccessTokenClaims{
-    pub fn new(id: i32, username: &str, email: &str, is_admin: i8, is_verified: bool, exp_seconds: i64) -> Self{
-        Self{
+impl AccessTokenClaims {
+    pub fn new(
+        id: i32,
+        username: &str,
+        email: &str,
+        is_admin: i8,
+        is_verified: bool,
+        exp_seconds: i64,
+    ) -> Self {
+        Self {
             sub: id.to_string(),
             username: username.to_string(),
             email: email.to_string(),
             is_admin: is_admin == 1,
             exp: get_expiration(exp_seconds),
-            is_verified: is_verified
+            is_verified,
         }
     }
 }
@@ -108,7 +115,7 @@ fn decode_access_token(token: String) -> Result<AuthUser, ServiceError> {
         is_admin: decoded.claims.is_admin,
         username: decoded.claims.username,
         email: decoded.claims.email,
-        is_verified: decoded.claims.is_verified
+        is_verified: decoded.claims.is_verified,
     })
 }
 
@@ -118,16 +125,16 @@ pub struct RefreshTokenClaims {
     exp: usize,
 }
 
-impl RefreshTokenClaims{
-    pub fn new(id: i32, exp_seconds: i64) -> Self{
-        Self{
+impl RefreshTokenClaims {
+    pub fn new(id: i32, exp_seconds: i64) -> Self {
+        Self {
             sub: id.to_string(),
-            exp: get_expiration(exp_seconds)
+            exp: get_expiration(exp_seconds),
         }
     }
 }
 
-pub fn decode_refresh_token(token: &str) -> Result<i32, ServiceError>{
+pub fn decode_refresh_token(token: &str) -> Result<i32, ServiceError> {
     let decoded = decode::<RefreshTokenClaims>(
         token,
         &DecodingKey::from_secret(JWT_SECRET),
@@ -144,7 +151,7 @@ pub fn decode_refresh_token(token: &str) -> Result<i32, ServiceError>{
     Ok(uid)
 }
 
-pub fn get_expiration(seconds: i64) -> usize{
+pub fn get_expiration(seconds: i64) -> usize {
     Utc::now()
         .checked_add_signed(chrono::Duration::seconds(seconds))
         .expect("valid timestamp")
@@ -162,9 +169,8 @@ where
     )
 }
 
-pub fn map_decode_err(err: JwtError, token_name: &str) -> ServiceError
-{
-    if let ErrorKind::ExpiredSignature = err.kind(){
+pub fn map_decode_err(err: JwtError, token_name: &str) -> ServiceError {
+    if let ErrorKind::ExpiredSignature = err.kind() {
         return ServiceError::JWTExpiredToken(token_name.to_string());
     }
 

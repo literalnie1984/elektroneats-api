@@ -3,7 +3,7 @@ use actix_web::http::header;
 use async_std::sync::RwLock;
 use kantyna_api::init_db;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
-use log::error;
+use log::{error, info};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ async fn main() -> std::io::Result<()> {
                     error!("Error during db init: {}", e);
                     std::io::Error::new(std::io::ErrorKind::Other, "DB init err")
                 })?;
-                eprintln!("DB init successful");
+                info!("DB init successful");
                 return Ok(());
             }
             _ => panic!("arg not supported"),
@@ -105,6 +105,7 @@ async fn main() -> std::io::Result<()> {
                     .service(get_menu_all)
                     .service(get_menu_today)
                     .service(get_menu_day)
+                    .service(update)
                     .service(last_menu_update),
             );
         App::new()

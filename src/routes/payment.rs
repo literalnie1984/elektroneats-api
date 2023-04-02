@@ -1,7 +1,6 @@
 use actix_web::{get, post, web, HttpRequest};
 use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
-use serde::Serialize;
 use std::{borrow::Borrow, collections::HashMap, mem};
 use stripe::{
     self, CreateCustomer, CreatePaymentIntent, Customer, EventObject, EventType, PaymentIntent,
@@ -87,20 +86,10 @@ async fn received_payment(
     Ok("tak".into())
 }
 
-#[derive(Serialize)]
-struct Balance {
-    balance: i64,
-}
-
 #[get("/balance")]
-async fn get_balance(
-    user: AuthUser,
-    data: web::Data<AppState>,
-) -> Result<web::Json<Balance>, ServiceError> {
+async fn get_balance(user: AuthUser, data: web::Data<AppState>) -> Result<String, ServiceError> {
     let user = get_user(&data.conn, user.id, &data.stripe_client.0).await?;
-    Ok(web::Json(Balance {
-        balance: user.balance.unwrap(),
-    })) // 1564 -> 15.64
+    Ok(serde_json::json!({"balance": user.balance.unwrap()}).to_string())
 }
 
 #[get("/details")]

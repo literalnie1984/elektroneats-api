@@ -30,7 +30,11 @@ impl MigrationTrait for Migration {
                             .timestamp()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(DinnerOrders::Status).tiny_unsigned().not_null())
+                    .col(
+                        ColumnDef::new(DinnerOrders::Status)
+                            .tiny_unsigned()
+                            .not_null(),
+                    )
                     /* .col(
                         ColumnDef::new(DinnerOrders::CollectionCode)
                             .integer()

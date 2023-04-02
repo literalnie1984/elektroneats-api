@@ -1,16 +1,15 @@
 use std::{mem::take, vec};
 
 use actix_web::web;
-use entity::{dinner, extras, extras_dinner, menu_info};
-use log::info;
+use entity::{dinner, extras, extras_dinner, menu_info, prelude::Dinner};
 use scraper::{Html, Selector};
-use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, QueryOrder, Set};
 use serde::Serialize;
 
 use crate::{convert_err_to_500, errors::ServiceError, map_db_err};
 
-const MENU_URL: &'static str = "https://zse.edu.pl/kantyna/";
-const TWO_PARTS_DISHES_PREFIXES: [&'static str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
+const MENU_URL: &str = "https://zse.edu.pl/kantyna/";
+const TWO_PARTS_DISHES_PREFIXES: [&str; 4] = ["po ", "i ", "opiekane ", "myśliwskim"];
 
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct MenuDay {
@@ -66,7 +65,7 @@ fn vec_to_menu(mut vec: Vec<Vec<String>>) -> Vec<MenuDay> {
                 .any(|bl| bl)
             {
                 if let Some(last_dish) = menu_days[idx].dishes.last_mut() {
-                    last_dish.push_str(" ");
+                    last_dish.push(' ');
                     last_dish.push_str(curr_dish);
                 }
             } else {
@@ -82,7 +81,7 @@ fn vec_to_menu(mut vec: Vec<Vec<String>>) -> Vec<MenuDay> {
     {
         for idx in 0..3 {
             //extras usually is ziemniaki but can be ziemniaki / X, if so save X
-            let mut extra = extras[idx].splitn(2, "/");
+            let mut extra = extras[idx].splitn(2, '/');
             if let Some(extra) = extra.nth(1) {
                 menu_days[idx].extras = Some(trim_whitespace(extra));
             } else {
@@ -106,7 +105,7 @@ fn trim_whitespace(s: &str) -> String {
     owned
 }
 
-fn remove_spaces_and_utf8<'r>(s: &'r str) -> String {
+fn remove_spaces_and_utf8(s: &str) -> String {
     s.replace(|c: char| !c.is_ascii() || c == ' ', "")
 }
 
@@ -132,7 +131,6 @@ pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
     }) {
         let mut vec: Vec<_> = row
             .select(&td_selector)
-            .into_iter()
             .map(|td| td.text().map(trim_whitespace).collect::<String>())
             .collect();
 
@@ -143,7 +141,7 @@ pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
         if is_wed {
             thu_to_sat.push(vec);
         } else {
-            if let Some(txt) = vec.iter().nth(0) {
+            if let Some(txt) = vec.get(0) {
                 if txt == "CZWARTEK" {
                     is_wed = true;
                     continue;
@@ -185,7 +183,7 @@ pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), Servi
         },
         extras::ActiveModel {
             name: Set("kompot".into()),
-            price: Set(Decimal::new(05, 1)),
+            price: Set(Decimal::new(5, 1)),
             image: Set("ekompot".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Beverage),
             ..Default::default()
@@ -203,8 +201,20 @@ pub async fn update_menu(
     conn: &DatabaseConnection,
     mut menu: Vec<(u8, MenuDay)>,
 ) -> Result<(), ServiceError> {
-    insert_static_extras(conn).await?;
-    let mut prev_last_insert_id = 1;
+    // insert_static_extras(conn).await?; moved to init_db
+    let mut prev_last_insert_id = {
+        let last_id = Dinner::find()
+            .order_by(dinner::Column::Id, migration::Order::Desc)
+            .one(conn)
+            .await
+            .map_err(map_db_err)?;
+        //if there is no last user id, ther are none so table is empty
+        if let Some(last_id) = last_id {
+            last_id.id
+        } else {
+            1
+        }
+    };
     let mut extras_dinners_all: Vec<extras_dinner::ActiveModel> =
         Vec::with_capacity((3.5 * menu.len() as f32).round() as usize);
 
@@ -222,9 +232,9 @@ pub async fn update_menu(
         let mut dinners: Vec<_> = menu
             .dishes
             .iter_mut()
-            .map(|mut dish| dinner::ActiveModel {
-                image: Set(format!("d{}.jpg", remove_spaces_and_utf8(&dish))),
-                name: Set(take(&mut dish)),
+            .map(|dish| dinner::ActiveModel {
+                image: Set(format!("d{}.jpg", remove_spaces_and_utf8(dish))),
+                name: Set(take(dish)),
                 r#type: Set(entity::sea_orm_active_enums::Type::Main),
                 week_day: Set(*day),
                 max_supply: Set(15),
@@ -280,25 +290,26 @@ pub async fn update_menu(
 
         prev_last_insert_id = curr_last + 2;
     }
-    info!("{:#?}", extras_dinners_all); //SOME SCRAPING PROBLEM
     extras_dinner::Entity::insert_many(extras_dinners_all)
         .exec(conn)
         .await
         .map_err(map_db_err)?;
 
     //last menu update date
-    let menu_info_model = menu_info::ActiveModel{
+    let menu_info_model = menu_info::ActiveModel {
         id: Set(1),
-        last_update: Set(chrono::offset::Utc::now())
+        last_update: Set(chrono::offset::Utc::now()),
     };
 
     menu_info::Entity::insert(menu_info_model)
-    .on_conflict(
-        sea_orm::sea_query::OnConflict::column(menu_info::Column::LastUpdate)
-            .update_column(menu_info::Column::LastUpdate)
-            .to_owned()
-    )
-    .exec(conn).await.map_err(map_db_err)?;
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(menu_info::Column::LastUpdate)
+                .update_column(menu_info::Column::LastUpdate)
+                .to_owned(),
+        )
+        .exec(conn)
+        .await
+        .map_err(map_db_err)?;
 
     Ok(())
 }

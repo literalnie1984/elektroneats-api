@@ -13,12 +13,12 @@ impl VerificationType {
         code: &str,
     ) -> Result<Message, lettre::error::Error> {
         match self {
-            &Self::Register => Message::builder()
+            Self::Register => Message::builder()
                 .from(from)
                 .to(to)
                 .subject("Twój kod do kantyny")
                 .body(format!("Wpisz ten kod aby aktywowć konto: {}", code)),
-            &Self::Delete => Message::builder()
+            Self::Delete => Message::builder()
                 .from(from)
                 .to(to)
                 .subject("Kantyna - usuwanie konta")
@@ -28,8 +28,8 @@ impl VerificationType {
 
     pub fn code_len(&self) -> usize {
         match self {
-            &Self::Register => 4,
-            &Self::Delete => 8,
+            Self::Register => 4,
+            Self::Delete => 8,
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::scraper::{scrape_menu, update_menu};
+use crate::scraper::{insert_static_extras, scrape_menu, update_menu};
 use actix_web::HttpRequest;
 use appstate::ActivatorsVec;
 use entity::prelude::User;
@@ -72,9 +72,7 @@ pub async fn send_verification_mail(
             .unwrap()
             .credentials(Credentials::new(
                 "kantyna.noreply@mikut.dev".to_owned(),
-                dotenvy::var("EMAIL_PASS")
-                    .expect("NO EMAIL_PASS val provided in .env")
-                    .to_string(),
+                dotenvy::var("EMAIL_PASS").expect("NO EMAIL_PASS val provided in .env"),
             ))
             .authentication(vec![Mechanism::Plain])
             .pool_config(PoolConfig::new().max_size(20))
@@ -144,6 +142,7 @@ pub async fn get_user(
 
 pub async fn init_db(conn: &DatabaseConnection) -> Result<(), ServiceError> {
     let menu = scrape_menu().await?;
+    insert_static_extras(conn).await?;
     update_menu(conn, menu).await?;
     Ok(())
 }

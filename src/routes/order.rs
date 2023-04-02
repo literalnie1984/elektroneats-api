@@ -1,17 +1,21 @@
-use std::{mem, collections::{HashSet, HashMap}};
+use std::{collections::{HashSet, HashMap}, mem};
 
 use actix_web::{get, post, web};
-use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user, model_enums::Status};
+use entity::{
+    dinner, dinner_orders, extras, extras_order, model_enums::Status, user, user_dinner_orders,
+};
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
-use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
 
 use crate::{
     appstate::AppState,
     convert_err_to_500,
     errors::ServiceError,
     jwt_auth::AuthUser,
-    routes::structs::{OrderRequest, UserWithOrders, DinnerResponse, OrderResponse, AllUsersOrders, UserOrders}, map_db_err, get_user, pay,
+    map_db_err,
+    routes::structs::{
+        AllUsersOrders, DinnerResponse, OrderRequest, OrderResponse, UserOrders, UserWithOrders,
+    }, get_user, pay,
 };
 
 //TODO: TRANSACTIONS PROBABLY
@@ -25,11 +29,17 @@ async fn create_order(
     let order = order.into_inner();
     let user_id = user.id;
 
-    let dinner_ids = 
-    order.dinners.iter().map(|x| x.dinner_id).collect::<Vec<_>>();
+    let dinner_ids = order
+        .dinners
+        .iter()
+        .map(|x| x.dinner_id)
+        .collect::<Vec<_>>();
 
-    let extras_ids = 
-    order.dinners.iter().map(|x| x.extras_ids.clone()).flatten().collect::<Vec<_>>();
+    let extras_ids = order
+        .dinners
+        .iter()
+        .flat_map(|x| x.extras_ids.clone())
+        .collect::<Vec<_>>();
 
     let dinners:Vec<(i32, Decimal)> = dinner::Entity::find()
         .filter(dinner::Column::Id.is_in(dinner_ids.clone()))
@@ -114,7 +124,6 @@ async fn get_user_orders(
     let orders = dinner_orders::Entity::find()
         .filter(dinner_orders::Column::UserId.eq(user_id))
         .filter(dinner_orders::Column::Status.is_in(status.to_vec()))
-        // .filter(if completed {dinner_orders::Column::UserId.eq(Status::Collected)} else {dinner_orders::Column::UserId.ne(Status::Collected)})
         .all(db)
         .await
         .map_err(db_err)?;
@@ -154,7 +163,7 @@ async fn get_user_orders(
                     .collect::<Vec<_>>();
 
                 DinnerResponse {
-                    dinner_id: dinner_id,
+                    dinner_id,
                     extras_ids: mem::take(&mut extras),
                 }
             })
@@ -163,7 +172,7 @@ async fn get_user_orders(
         output.push(OrderResponse {
             order_id: order.id,
             collection_date: order.collection_date,
-            status:  Status::from_repr(order.status).unwrap(),
+            status: Status::from_repr(order.status).unwrap(),
             dinners: mem::take(&mut dinners_with_extras),
         });
     }
@@ -269,7 +278,7 @@ async fn get_all_pending_orders(
             output.last_mut().unwrap().orders.push(OrderResponse {
                 order_id: order.id,
                 collection_date: order.collection_date,
-                status:  Status::from_repr(order.status).unwrap(),
+                status: Status::from_repr(order.status).unwrap(),
                 dinners: mem::take(&mut dinners_with_extras),
             });
         }
