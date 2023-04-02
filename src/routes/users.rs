@@ -1,7 +1,7 @@
 use std::mem;
 
 use actix_web::web::Path;
-use actix_web::{get, post, web, Responder};
+use actix_web::{get, post, web, Responder, put, delete};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, ModelTrait, QueryFilter, Set};
 
 use bcrypt::{hash_with_salt, verify, DEFAULT_COST};
@@ -23,7 +23,7 @@ use crate::routes::structs::{UserChangePassword, UserLogin, UserRegister};
 
 use log::error;
 
-#[post("/change-password")]
+#[put("/password")]
 async fn change_password(
     user: AuthUser,
     data: web::Data<AppState>,
@@ -60,7 +60,7 @@ async fn change_password(
     }
 }
 
-#[get("/get-user-data")]
+#[get("/data")]
 async fn get_user_data(user: AuthUser) -> impl Responder {
     // let conn = &data.conn;
 
@@ -78,7 +78,7 @@ async fn get_user_data(user: AuthUser) -> impl Responder {
     })
 }
 
-#[get("/delete")]
+#[delete("/delete")]
 async fn get_delete_mail(
     user: AuthUser,
     data: web::Data<AppState>,
