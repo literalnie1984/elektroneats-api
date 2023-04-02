@@ -1,6 +1,6 @@
 use std::{collections::HashSet, mem};
 
-use crate::{jwt_auth::AuthUser, routes::structs::MenuResult3D};
+use crate::{jwt_auth::AuthUser, routes::structs::{MenuResult3D, LastUpdateResponse}};
 use actix_web::{get, web, Responder};
 use chrono::{DateTime, Datelike, Utc};
 use entity::{
@@ -133,7 +133,7 @@ async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, S
         .map_err(map_db_err)?
         .unwrap();
 
-    Ok(serde_json::json!({ "lastUpdate": date }).to_string())
+    Ok(web::Json(LastUpdateResponse{ last_update: date }))
 }
 
 #[get("/update")]
