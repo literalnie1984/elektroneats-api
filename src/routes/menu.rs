@@ -11,7 +11,7 @@ use sea_orm::ModelTrait;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter,  QuerySelect,
 };
-use crate::routes::structs::MenuResult3D;
+use crate::{routes::structs::MenuResult3D, jwt_auth::AuthUser};
 
 use crate::{
     appstate::AppState,
@@ -122,7 +122,13 @@ async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, S
 }
 
 #[get("/update")]
-async fn update(data: web::Data<AppState>) -> Result<String, ServiceError> {
+async fn update(data: web::Data<AppState>, user: AuthUser) -> Result<String, ServiceError> {
+    if !user.is_admin {
+        return Err(ServiceError::Unauthorized(
+            "Only admin can access that data".to_string(),
+        ));
+    }
+    
     let menu = scrape_menu().await?;
     update_menu(&data.conn, menu).await?;
     Ok("Success".into())
