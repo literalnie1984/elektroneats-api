@@ -105,6 +105,10 @@ fn trim_whitespace(s: &str) -> String {
     owned
 }
 
+fn remove_spaces_and_utf8<'r>(s: &'r str) -> String {
+    s.replace(|c: char| !c.is_ascii() || c == ' ', "")
+}
+
 pub async fn scrape_menu() -> Result<Vec<(u8, MenuDay)>, ServiceError> {
     let site_data = web::block(|| get_menu().expect("Couldn't get site data"))
         .await
@@ -205,7 +209,7 @@ pub async fn update_menu(
 
     for (day, menu) in menu.iter_mut() {
         let soup = dinner::ActiveModel {
-            image: Set(format!("s{}.jpg", menu.soup.replace(" ", ""))),
+            image: Set(format!("s{}.jpg", remove_spaces_and_utf8(&menu.soup))),
             name: Set(take(&mut menu.soup)),
             r#type: Set(entity::sea_orm_active_enums::Type::Soup),
             week_day: Set(*day),
@@ -218,7 +222,7 @@ pub async fn update_menu(
             .dishes
             .iter_mut()
             .map(|mut dish| dinner::ActiveModel {
-                image: Set(format!("d{}.jpg", dish.replace(" ", ""))),
+                image: Set(format!("d{}.jpg", remove_spaces_and_utf8(&dish))),
                 name: Set(take(&mut dish)),
                 r#type: Set(entity::sea_orm_active_enums::Type::Main),
                 week_day: Set(*day),
@@ -237,7 +241,7 @@ pub async fn update_menu(
         let additional = {
             if let Some(other_extra) = menu.extras.clone() {
                 let res = extras::Entity::insert(extras::ActiveModel {
-                    image: Set(format!("e{}.jpg", other_extra.replace(" ", ""))),
+                    image: Set(format!("e{}.jpg", remove_spaces_and_utf8(&other_extra))),
                     name: Set(other_extra),
                     price: Set(Decimal::new(10, 1)),
                     r#type: Set(entity::sea_orm_active_enums::ExtrasType::Filler),
