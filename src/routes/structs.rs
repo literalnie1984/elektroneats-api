@@ -76,6 +76,12 @@ pub struct Dinner {
     pub extras_ids: Vec<i32>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderStatusRequest{
+    pub new_status: Status,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderRequest {
@@ -94,6 +100,7 @@ pub struct DinnerResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderResponse {
+    pub order_id: i32,
     #[serde(with = "ts_seconds")]
     pub collection_date: DateTime<Utc>,
     pub status: Status,

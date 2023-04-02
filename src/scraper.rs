@@ -4,7 +4,7 @@ use actix_web::web;
 use entity::{dinner, extras, extras_dinner, menu_info};
 use log::info;
 use scraper::{Html, Selector};
-use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set, ActiveValue::NotSet, ActiveModelTrait, Unchanged};
+use sea_orm::{prelude::Decimal, DatabaseConnection, EntityTrait, Set};
 use serde::Serialize;
 
 use crate::{convert_err_to_500, errors::ServiceError, map_db_err};

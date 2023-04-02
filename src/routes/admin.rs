@@ -1,14 +1,13 @@
-use actix_web::{get, put, web};
+use actix_web::{put, web};
 use entity::{
     dinner, dinner_orders,
-    prelude::{Dinner, DinnerOrders}, model_enums::Status,
+    prelude::{Dinner, DinnerOrders},
 };
 use sea_orm::{prelude::Decimal, ActiveModelTrait, EntityTrait, Set, ActiveEnum};
-use serde::{Serialize, Deserialize};
 use std::mem;
 
 use crate::{
-    appstate::AppState, errors::ServiceError, jwt_auth::AuthUser, map_db_err, update_if_some,
+    appstate::AppState, errors::ServiceError, jwt_auth::AuthUser, map_db_err, update_if_some, routes::structs::OrderStatusRequest,
 };
 
 use super::structs::UpdateMenu;
@@ -53,24 +52,18 @@ async fn update_dish(
     Ok("Success".into())
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusRequest{
-    pub new_status: Status,
-}
-
 #[put("/{id}/status")]
 async fn change_order_status(
     user: AuthUser,
     path: web::Path<i32>,
     data: web::Data<AppState>,
-    body: web::Json<StatusRequest>
+    body: web::Json<OrderStatusRequest>
 ) -> Result<String, ServiceError> {
-    // if !user.is_admin {
-    //     return Err(ServiceError::Unauthorized(
-    //         "You need to be an admin to access this".into(),
-    //     ));
-    // }
+    if !user.is_admin {
+        return Err(ServiceError::Unauthorized(
+            "You need to be an admin to access this".into(),
+        ));
+    }
 
     let conn = &data.conn;
     let claim_id = path.into_inner();

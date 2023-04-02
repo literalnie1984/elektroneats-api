@@ -1,8 +1,6 @@
 use actix_files::Files;
-use actix_web::dev::Service;
 use actix_web::http::header;
 use async_std::sync::RwLock;
-use kantyna_api::errors::ServiceError;
 use kantyna_api::init_db;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
 use log::error;
