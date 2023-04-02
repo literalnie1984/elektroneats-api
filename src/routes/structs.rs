@@ -48,15 +48,22 @@ pub struct RefreshTokenRequest {
 }
 
 #[derive(Serialize)]
+pub struct MenuResult3D{
+    pub response: Vec<Vec<DinnerWithExtras>>,
+    pub extras: HashSet<extras::Model>
+}
+
+#[derive(Serialize)]
 pub struct MenuOneDay {
     pub dinners: Vec<dinner::Model>,
     pub extras: Vec<extras::Model>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DinnerWithExtras {
     pub dinner: dinner::Model,
-    pub extras: Vec<extras::Model>,
+    pub extras_ids: Vec<i32>,
 }
 
 #[derive(Serialize, Deserialize, Default)]

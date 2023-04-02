@@ -78,7 +78,7 @@ async fn get_user_data(user: AuthUser) -> impl Responder {
     })
 }
 
-#[delete("/delete")]
+#[post("/delete")]
 async fn get_delete_mail(
     user: AuthUser,
     data: web::Data<AppState>,
@@ -96,7 +96,7 @@ async fn get_delete_mail(
     send_verification_mail(&user.email, &data.activators_del, VerificationType::Delete).await
 }
 
-#[post("/delete/{token}")]
+#[delete("/delete/{token}")]
 async fn delete_acc(
     user: AuthUser,
     data: web::Data<AppState>,

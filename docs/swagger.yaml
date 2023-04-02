@@ -1,6 +1,18 @@
 openapi: 3.0.0
 components:
   schemas:
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    TokenGenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
     OrderStatus:
       type: string
       enum:
@@ -115,18 +127,24 @@ components:
             - Ready
             - Collected
     MenuVec:
-      type: array
-      items:
-        type: array
-        items:
-          type: object
-          properties:
-            "dinner":
-              $ref: "#/components/schemas/DinnerModel"
-            "extras":
-              type: array
-              items:
-                $ref: "#/components/schemas/ExtrasModel"
+      type: object
+      properties:
+        response:
+          type: array
+          items:
+            type: array
+            items:
+              type: object
+              properties:
+                "dinner":
+                  $ref: "#/components/schemas/DinnerModel"
+                "extrasIds":
+                  type: array
+                  items:
+                    type: integer
+                    format: int32
+        extras:
+          $ref: "#/components/schemas/ExtrasModel"
     MenuDay:
       type: object
       properties:
@@ -338,7 +356,7 @@ paths:
         "500":
           description: Internal Server Error
   "/user/activate/{token}":
-    get:
+    post:
       summary: activates user account with token generated during register
       responses:
         "200":
@@ -392,7 +410,7 @@ paths:
       security:
         - userAuth: []
   /user/delete:
-    delete:
+    post:
       summary: Sends delete account email to given currently logged-in user
       security:
         - userAuth: []
@@ -419,7 +437,7 @@ paths:
             type: string
             format: JWT
   "/user/delete/{token}":
-    get:
+    delete:
       summary: deletes account, token generated in /user/delete
       responses:
         "200":
@@ -441,6 +459,27 @@ paths:
           required: true
           schema:
             type: string
+  /user/refresh-token:
+    post:
+      summary: return new access token
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenGenResponse'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      requestBody:
+        content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenRequest'
+        required: true
+
   /user/data:
     get:
       summary: gets data about given user

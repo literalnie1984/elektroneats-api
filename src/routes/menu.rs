@@ -1,4 +1,4 @@
-use std::mem;
+use std::{mem, collections::HashSet};
 
 use actix_web::{get, web, Responder};
 use chrono::{DateTime, Datelike, Utc};
@@ -9,8 +9,9 @@ use entity::{
 };
 use sea_orm::ModelTrait;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder, QuerySelect,
+    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter,  QuerySelect,
 };
+use crate::{routes::structs::MenuResult3D, jwt_auth::AuthUser};
 
 use crate::{
     appstate::AppState,
@@ -22,7 +23,6 @@ use crate::{
 
 use super::structs::DinnerWithExtras;
 
-type MenuResult3d = Result<web::Json<Vec<Vec<DinnerWithExtras>>>, ServiceError>;
 type MenuResult = Result<web::Json<MenuOneDay>, ServiceError>;
 
 async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
@@ -63,39 +63,33 @@ async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
     Ok(web::Json(MenuOneDay { dinners, extras }))
 }
 
-async fn get_menu_3d(conn: &DatabaseConnection) -> MenuResult3d {
+async fn get_menu_3d(conn: &DatabaseConnection) -> Result<web::Json<MenuResult3D>, ServiceError> {
     let mut dinners = Dinner::find()
-        .order_by_asc(dinner::Column::WeekDay)
         .all(conn)
         .await
         .map_err(map_db_err)?;
 
-    let mut extras = dinners
+    let extras = dinners
         .load_many_to_many(Extras, ExtrasDinner, conn)
         .await
         .map_err(map_db_err)?;
+    
+    let mut result = MenuResult3D{response: vec![Vec::with_capacity(4) ; 6], extras: HashSet::new() };
+    for (dinner,extras) in dinners.iter_mut().zip(extras.iter()) {
+        let index = dinner.week_day as usize;
 
-    let mut response = Vec::with_capacity(6);
-    let mut last_day = 0;
-    let mut dinner_day = Vec::with_capacity(4);
-    for (dinner, extras) in dinners.iter_mut().zip(extras.iter_mut()) {
-        if dinner.week_day != last_day {
-            response.push(dinner_day);
-            dinner_day = Vec::with_capacity(4);
-            last_day = dinner.week_day;
-        }
-        dinner_day.push(DinnerWithExtras {
+        result.extras.extend(extras.clone());
+        result.response[index].push(DinnerWithExtras {
             dinner: mem::take(dinner),
-            extras: mem::take(extras),
+            extras_ids: extras.iter().map(|x| x.id).collect(),
         });
     }
-    response.push(dinner_day);
 
-    Ok(web::Json(response))
+    Ok(web::Json(result))
 }
 
 #[get("/")]
-async fn get_menu_all(data: web::Data<AppState>) -> MenuResult3d {
+async fn get_menu_all(data: web::Data<AppState>) -> Result<web::Json<MenuResult3D>, ServiceError> {
     get_menu_3d(&data.conn).await
 }
 
@@ -128,7 +122,13 @@ async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, S
 }
 
 #[get("/update")]
-async fn update(data: web::Data<AppState>) -> Result<String, ServiceError> {
+async fn update(data: web::Data<AppState>, user: AuthUser) -> Result<String, ServiceError> {
+    if !user.is_admin {
+        return Err(ServiceError::Unauthorized(
+            "Only admin can access that data".to_string(),
+        ));
+    }
+    
     let menu = scrape_menu().await?;
     update_menu(&data.conn, menu).await?;
     Ok("Success".into())
