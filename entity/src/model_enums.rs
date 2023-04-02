@@ -12,3 +12,13 @@ pub enum Weekday {
     Friday = 4,
     Saturday = 5,
 }
+
+#[derive(DeriveActiveEnum, EnumIter, Serialize, Deserialize, Clone)]
+#[sea_orm(rs_type = "u8", db_type = "Integer")]
+#[repr(u8)]
+pub enum Status {
+    Paid = 0,
+    Prepared = 1,
+    Ready = 2,
+    Collected = 3,
+}

@@ -1,7 +1,7 @@
 use std::{mem, collections::{HashSet, HashMap}};
 
 use actix_web::{get, post, web};
-use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user};
+use entity::{dinner, dinner_orders, extras, extras_order, user_dinner_orders, user, model_enums::Status};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -108,12 +108,12 @@ async fn create_order(
 async fn get_user_orders(
     user_id: i32,
     db: &DatabaseConnection,
-    realized: i8,
+    completed: bool,
 ) -> Result<web::Json<UserOrders>, ServiceError> {
     let db_err = |err| convert_err_to_500(err, Some("Database error getting user orders"));
     let orders = dinner_orders::Entity::find()
         .filter(dinner_orders::Column::UserId.eq(user_id))
-        .filter(dinner_orders::Column::Completed.eq(realized))
+        .filter(if completed {dinner_orders::Column::UserId.eq(Status::Collected)} else {dinner_orders::Column::UserId.ne(Status::Collected)})
         .all(db)
         .await
         .map_err(db_err)?;
@@ -174,7 +174,7 @@ async fn get_completed_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, 1).await
+    get_user_orders(user_id, db, true).await
 }
 
 #[get("/pending")]
@@ -185,7 +185,7 @@ async fn get_pending_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, 0).await
+    get_user_orders(user_id, db, false).await
 }
 
 #[get("/pending")]
@@ -197,7 +197,7 @@ async fn get_all_pending_orders(user: AuthUser, data: web::Data<AppState>) -> Re
 
     let users_with_orders = user::Entity::find()
         .find_with_related(dinner_orders::Entity)
-        .filter(dinner_orders::Column::Completed.eq(0))
+        .filter(dinner_orders::Column::Status.ne(Status::Collected))
         .all(db)
         .await
         .map_err(map_db_err)?;
