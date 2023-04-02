@@ -167,21 +167,21 @@ pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), Servi
         extras::ActiveModel {
             name: Set("ziemniaki".into()),
             price: Set(Decimal::new(10, 1)),
-            image: Set("TODO".into()),
+            image: Set("eziemniaki.jpg".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Filler),
             ..Default::default()
         },
         extras::ActiveModel {
             name: Set("surówka".into()),
             price: Set(Decimal::new(10, 1)),
-            image: Set("TODO".into()),
+            image: Set("esurowka.jpg".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Salad),
             ..Default::default()
         },
         extras::ActiveModel {
             name: Set("kompot".into()),
             price: Set(Decimal::new(05, 1)),
-            image: Set("TODO".into()),
+            image: Set("ekompot".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Beverage),
             ..Default::default()
         },
@@ -205,12 +205,12 @@ pub async fn update_menu(
 
     for (day, menu) in menu.iter_mut() {
         let soup = dinner::ActiveModel {
+            image: Set(format!("s{}.jpg", menu.soup.replace(" ", ""))),
             name: Set(take(&mut menu.soup)),
             r#type: Set(entity::sea_orm_active_enums::Type::Soup),
             week_day: Set(*day),
             max_supply: Set(15),
             price: Set(Decimal::new(15, 1)),
-            image: Set("TODO".into()),
             ..Default::default()
         };
 
