@@ -184,7 +184,7 @@ pub async fn insert_static_extras(conn: &DatabaseConnection) -> Result<(), Servi
         extras::ActiveModel {
             name: Set("kompot".into()),
             price: Set(Decimal::new(5, 1)),
-            image: Set("ekompot".into()),
+            image: Set("ekompot.jpg".into()),
             r#type: Set(entity::sea_orm_active_enums::ExtrasType::Beverage),
             ..Default::default()
         },
