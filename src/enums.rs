@@ -60,6 +60,6 @@ impl VerificationType {
                     </tr>
             </table>
            "#,text,
-           code.chars().map(|chr| format!(r#"<b style="background-color: #AAAAAA30;border-radius: 10px; padding: 10px;">{}</b>"#,chr)).collect::<String>())
+           code.chars().map(|ch| format!(r#"<b style="background-color: #AAAAAA30;border-radius: 10px; padding: 10px;">{}</b>"#,ch)).collect::<String>())
     }
 }
