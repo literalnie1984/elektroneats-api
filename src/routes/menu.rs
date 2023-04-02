@@ -1,5 +1,6 @@
-use std::{mem, collections::HashSet};
+use std::{collections::HashSet, mem};
 
+use crate::{jwt_auth::AuthUser, routes::structs::MenuResult3D};
 use actix_web::{get, web, Responder};
 use chrono::{DateTime, Datelike, Utc};
 use entity::{
@@ -9,9 +10,8 @@ use entity::{
 };
 use sea_orm::ModelTrait;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter,  QuerySelect,
+    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder, QuerySelect,
 };
-use crate::{routes::structs::MenuResult3D, jwt_auth::AuthUser};
 
 use crate::{
     appstate::AppState,
@@ -65,6 +65,7 @@ async fn get_menu(conn: &DatabaseConnection, day: u8) -> MenuResult {
 
 async fn get_menu_3d(conn: &DatabaseConnection) -> Result<web::Json<MenuResult3D>, ServiceError> {
     let mut dinners = Dinner::find()
+        .order_by(dinner::Column::WeekDay, migration::Order::Asc)
         .all(conn)
         .await
         .map_err(map_db_err)?;
@@ -73,16 +74,30 @@ async fn get_menu_3d(conn: &DatabaseConnection) -> Result<web::Json<MenuResult3D
         .load_many_to_many(Extras, ExtrasDinner, conn)
         .await
         .map_err(map_db_err)?;
-    
-    let mut result = MenuResult3D{response: vec![Vec::with_capacity(4) ; 6], extras: HashSet::new() };
-    for (dinner,extras) in dinners.iter_mut().zip(extras.iter()) {
+
+    let mut result = MenuResult3D {
+        response: vec![
+            DinnerWithExtras {
+                dinners: Vec::with_capacity(4),
+                extras_ids: Vec::new()
+            };
+            6
+        ],
+        extras: HashSet::new(),
+    };
+    for (dinner, extras) in dinners.iter_mut().zip(extras.iter()) {
         let index = dinner.week_day as usize;
 
         result.extras.extend(extras.clone());
-        result.response[index].push(DinnerWithExtras {
+        result.response[index].dinners.push(mem::take(dinner));
+        if result.response[index].extras_ids.is_empty() {
+            result.response[index].extras_ids = extras.iter().map(|x| x.id).collect();
+        }
+
+        /* push(DinnerWithExtras {
             dinner: mem::take(dinner),
             extras_ids: extras.iter().map(|x| x.id).collect(),
-        });
+        }); */
     }
 
     Ok(web::Json(result))
@@ -128,7 +143,7 @@ async fn update(data: web::Data<AppState>, user: AuthUser) -> Result<String, Ser
             "Only admin can access that data".to_string(),
         ));
     }
-    
+
     let menu = scrape_menu().await?;
     update_menu(&data.conn, menu).await?;
     Ok("Success".into())

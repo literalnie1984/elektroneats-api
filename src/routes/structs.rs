@@ -48,9 +48,9 @@ pub struct RefreshTokenRequest {
 }
 
 #[derive(Serialize)]
-pub struct MenuResult3D{
-    pub response: Vec<Vec<DinnerWithExtras>>,
-    pub extras: HashSet<extras::Model>
+pub struct MenuResult3D {
+    pub response: Vec<DinnerWithExtras>,
+    pub extras: HashSet<extras::Model>,
 }
 
 #[derive(Serialize)]
@@ -62,7 +62,7 @@ pub struct MenuOneDay {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DinnerWithExtras {
-    pub dinner: dinner::Model,
+    pub dinners: Vec<dinner::Model>,
     pub extras_ids: Vec<i32>,
 }
 
@@ -85,7 +85,7 @@ pub struct Dinner {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OrderStatusRequest{
+pub struct OrderStatusRequest {
     pub new_status: Status,
 }
 
