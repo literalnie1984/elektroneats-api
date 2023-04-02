@@ -1,32 +1,25 @@
 openapi: 3.0.0
 components:
   schemas:
-    MenuVec:
-      type: array
-      items:
-        type: array
-        items:
-          type: object
-          properties:
-            "dinner":
-              $ref: "#/components/schemas/Dinners"
-            "extras":
-              type: array
-              items:
-                $ref: "#/components/schemas/Extras"
-    MenuDay:
-      type: object
-      properties:
-        "dinner":
-          $ref: "#/components/schemas/Dinners"
-        "extras":
-          type: array
-          items:
-            $ref: "#/components/schemas/Extras"
-      required:
-        - "dinners"
-        - "extras"
-    Extras:
+    OrderStatus:
+      type: string
+      enum:
+        - Paid
+        - Prepared
+        - Ready
+        - Collected
+    ExtrasType:
+      type: string
+      enum:
+        - Filler
+        - Beverage
+        - Salad
+    DinnerType:
+      type: string
+      enum:
+        - Soup
+        - Main
+    DinnerModel:
       type: object
       properties:
         id:
@@ -35,46 +28,18 @@ components:
         name:
           type: string
         price:
-          type: number
-          format: float
+          type: string
+          example: "0.0"
         image:
           type: string
-        type:
-          type: string
-          enum:
-            - Filler
-            - Beverage
-            - Salad
-      required:
-            - id
-            - name
-            - price
-            - image
-            - type
-    Dinners:
-      type: object
-      properties:
-        id:
+        weekDay:
           type: integer
-          format: int32
-        image:
-          type: string
+          format: uint8
         maxSupply:
           type: integer
           format: int32
-        name:
-          type: string
-        price:
-          type: number
-          format: float
         type:
-          type: string
-          enum:
-            - Soup
-            - Main
-          weekDay:
-              type: integer
-              format: int32
+          $ref: "#/components/schemas/DinnerType"
       required:
           - id
           - image
@@ -83,6 +48,99 @@ components:
           - price
           - type
           - weekDay
+    ExtrasModel:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        name:
+          type: string
+        price:
+          type: string
+          example: "0.0"
+        image:
+          type: string
+        type:
+          $ref: "#/components/schemas/ExtrasType"
+      required:
+          - id
+          - name
+          - price
+          - image
+          - type
+    DinnerResponse:
+      type: object
+      properties:
+        dinnerId:
+          type: integer
+          format: int32
+        extrasIds:
+          type: array
+          items:
+            type: integer
+            format: int32
+    OrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: integer
+          format: int32
+        collectionDate:
+          type: integer
+          format: int32
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        dinners:
+          type: array
+          items:
+              $ref: "#/components/schemas/DinnerResponse"
+    UserOrders:
+      type: object
+      properties:
+        response:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderResponse"
+        dinners:
+          type: array
+    OrderStatusRequest:
+      type: object
+      properties:
+        newStatus:
+          type: string
+          enum:
+            - Paid
+            - Prepared
+            - Ready
+            - Collected
+    MenuVec:
+      type: array
+      items:
+        type: array
+        items:
+          type: object
+          properties:
+            "dinner":
+              $ref: "#/components/schemas/DinnerModel"
+            "extras":
+              type: array
+              items:
+                $ref: "#/components/schemas/ExtrasModel"
+    MenuDay:
+      type: object
+      properties:
+        "dinners":
+          type: array
+          items:
+            $ref: "#/components/schemas/DinnerModel"
+        "extras":
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtrasModel"
+      required:
+        - "dinners"
+        - "extras"
     UserChangePassword:
       type: object
       properties:
@@ -176,10 +234,10 @@ components:
           format: float
         image:
           type: string
-        max_supply:
+        maxSupply:
           type: integer
           format: int32
-        week_day:
+        weekDay:
           $ref: '#/components/schemas/Weekday'
       required:
         - id
@@ -263,6 +321,22 @@ paths:
           schema:
             type: integer
             format: int32
+  "/menu/last-update":
+    get:
+      summary: return last menu update date
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lastUpdate:
+                    type: integer
+                    description: "Date of last update in unix seconds"
+        "500":
+          description: Internal Server Error
   "/user/activate/{token}":
     get:
       summary: activates user account with token generated during register
@@ -284,8 +358,8 @@ paths:
           required: true
           schema:
             type: string
-  /user/change-password:
-    post:
+  /user/password:
+    put:
       summary: changes password for given logged-in user
       responses:
         "200":
@@ -318,7 +392,7 @@ paths:
       security:
         - userAuth: []
   /user/delete:
-    get:
+    delete:
       summary: Sends delete account email to given currently logged-in user
       security:
         - userAuth: []
@@ -367,7 +441,7 @@ paths:
           required: true
           schema:
             type: string
-  /user/get-user-data:
+  /user/data:
     get:
       summary: gets data about given user
       security:
@@ -442,7 +516,7 @@ paths:
             schema:
               $ref: "#/components/schemas/UserRegister"
         required: true
-  /orders/create:
+  /user/orders/create:
     post:
       summary: creates a new order with given data
       responses:
@@ -456,7 +530,7 @@ paths:
         - in: header
           name: Authorization
           required: true
-          description: User must be an admin
+          description: Bearer <JWT Token>
           schema:
             type: string
             format: JWT
@@ -466,7 +540,7 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateOrder"
         required: true
-  /orders/pending-user-orders:
+  /user/orders/pending:
     get:
       summary: gets non realized user orders
       responses:
@@ -475,14 +549,14 @@ paths:
           content:  
             application/json:
               schema: 
-                $ref: "#/components/schemas/MenuDay"
+                $ref: "#/components/schemas/UserOrders"
         "401":
           description: Unauthorized
         "400":
           description: Bad Request
         "500":
           description: Internal Server Error
-  /orders/completed-user-orders:
+  /user/orders/completed:
     get:
       summary: gets realized user orders
       responses:
@@ -491,14 +565,14 @@ paths:
           content:  
             application/json:
               schema: 
-                $ref: "#/components/schemas/MenuDay"
+                $ref: "#/components/schemas/UserOrders"
         "401":
           description: Unauthorized
         "400":
           description: Bad Request
         "500":
           description: Internal Server Error
-  /admin/update-dish:
+  /admin/dish:
     put:
       summary: updates given dish with given data
       responses:
@@ -523,9 +597,9 @@ paths:
             schema:
               type: string
               format: JWT
-  /admin/claim/{id}:
-    get:
-      summary: Marks order with given id as claimed
+  /admin/orders/{id}/status:
+    put:
+      summary: Updates order status with given id
       responses:
         "200":
           description: Success msg
@@ -535,6 +609,11 @@ paths:
           description: Bad Request
         "500":
           description: Internal Server Error
+      requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStatusRequest"
       parameters:
           - in: header
             name: Authorization
