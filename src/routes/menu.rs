@@ -1,16 +1,16 @@
 use std::mem;
 
 use actix_web::{get, web, Responder};
-use chrono::{Datelike, DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use entity::{
     custom_impl::DinnerToExtras,
-    dinner,
-    prelude::{Dinner, Extras, ExtrasDinner},  menu_info,
+    dinner, menu_info,
+    prelude::{Dinner, Extras, ExtrasDinner},
 };
+use sea_orm::ModelTrait;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, QueryOrder, QuerySelect,
 };
-use sea_orm::ModelTrait;
 
 use crate::{
     appstate::AppState,
@@ -113,8 +113,7 @@ async fn get_menu_day(day: web::Path<u8>, data: web::Data<AppState>) -> MenuResu
     get_menu(&data.conn, day).await
 }
 
-#[get("/update")]
-async fn update(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
+async fn init(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
     let menu = scrape_menu().await?;
     update_menu(&data.conn, menu).await?;
     Ok("saved to db")
@@ -122,12 +121,14 @@ async fn update(data: web::Data<AppState>) -> Result<impl Responder, ServiceErro
 
 #[get("/last-update")]
 async fn last_menu_update(data: web::Data<AppState>) -> Result<impl Responder, ServiceError> {
-    let (date): (DateTime<Utc>) = menu_info::Entity::find()
-    .select_only()
-    .column(menu_info::Column::LastUpdate)
-    .into_tuple()
-    .one(&data.conn)
-    .await.map_err(map_db_err)?.unwrap();
+    let date: DateTime<Utc> = menu_info::Entity::find()
+        .select_only()
+        .column(menu_info::Column::LastUpdate)
+        .into_tuple()
+        .one(&data.conn)
+        .await
+        .map_err(map_db_err)?
+        .unwrap();
 
     Ok(serde_json::json!({ "lastUpdate": date }).to_string())
 }
