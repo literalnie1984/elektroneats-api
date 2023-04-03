@@ -149,7 +149,7 @@ async fn refresh_token(
         &user_query.email,
         user_query.admin,
         user_query.verified == 1,
-        60 * 10,
+        60 * 60 * 24 * 14,
     ))
     .map_err(|err| convert_err_to_500(err, Some("Error creating new access token")))?;
 
@@ -187,7 +187,7 @@ async fn login(
         &user_query.email,
         user_query.admin,
         user_query.verified == 1,
-        60 * 10,
+        60 * 60 * 24 * 14,
     ))
     .map_err(|err| convert_err_to_500(err, Some("Error creating access token")))?;
 
