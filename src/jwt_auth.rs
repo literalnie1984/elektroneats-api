@@ -7,10 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::ServiceError;
 
-//change @ Release
-const JWT_SECRET: &[u8] =
-    "gioryegioergb389458y85w4huuhierghlgrezhlgh89y5w48954w4w5huoiyh".as_bytes();
-
 pub struct AuthUser {
     pub id: i32,
     pub username: String,
@@ -97,9 +93,12 @@ impl AccessTokenClaims {
 }
 
 fn decode_access_token(token: String) -> Result<AuthUser, ServiceError> {
+    let binding = dotenvy::var("JWT_SECRET").expect("NO JWT_SECRET val provided in .env");
+    let secret = binding.as_bytes();
+    
     let decoded = decode::<AccessTokenClaims>(
         &token,
-        &DecodingKey::from_secret(JWT_SECRET),
+        &DecodingKey::from_secret(secret),
         &Validation::default(),
     )
     .map_err(|err| map_decode_err(err, "Access"))?;
@@ -135,9 +134,12 @@ impl RefreshTokenClaims {
 }
 
 pub fn decode_refresh_token(token: &str) -> Result<i32, ServiceError> {
+    let binding = dotenvy::var("JWT_SECRET").expect("NO JWT_SECRET val provided in .env");
+    let secret = binding.as_bytes();
+
     let decoded = decode::<RefreshTokenClaims>(
         token,
-        &DecodingKey::from_secret(JWT_SECRET),
+        &DecodingKey::from_secret(secret),
         &Validation::default(),
     )
     .map_err(|err| map_decode_err(err, "Refresh"))?;
@@ -162,10 +164,13 @@ pub fn encode_jwt<T>(data: &T) -> Result<String, JwtError>
 where
     T: Serialize,
 {
+    let binding = dotenvy::var("JWT_SECRET").expect("NO JWT_SECRET val provided in .env");
+    let secret = binding.as_bytes();
+
     encode(
         &Header::default(),
         &data,
-        &EncodingKey::from_secret(JWT_SECRET),
+        &EncodingKey::from_secret(secret),
     )
 }
 
