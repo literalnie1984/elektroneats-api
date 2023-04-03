@@ -16,17 +16,22 @@ use kantyna_api::appstate::{AppState, ClientWrapper};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let mut db_url: String = String::new();
+    let mut stripe_client: String = String::new();
+  
     //turn on logger if compiled in debug
     if cfg!(debug_assertions) {
         std::env::set_var("RUST_LOG", "info");
         std::env::set_var("RUST_BACKTRACE", "1");
         env_logger::init();
+        dotenvy::dotenv().expect(".env file not found");
+        db_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
+        stripe_secret = dotenvy::var("STRIPE_SECRET").expect("STRIPE_SECRET is not set in .env file");
+    } else {
+        db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL is not set in environment.");
+        stripe_secret = std::env::var("STRIPE_SECRET").expect("STRIPE_SECRET is not set in environment.");
     }
 
-    dotenvy::dotenv().expect(".env file not found");
-    let db_url = dotenvy::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
-    let stripe_secret =
-        dotenvy::var("STRIPE_SECRET").expect("STRIPE_SECRET is not set in .env file");
     let stripe_client = ClientWrapper::new(&stripe_secret);
 
     //establish db connection
