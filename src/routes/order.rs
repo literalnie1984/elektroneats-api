@@ -78,11 +78,11 @@ async fn create_order(
             .map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64)
             .sum::<i64>();
 
-    let customer = get_user(db, user.id, &data.stripe_client.0).await?;
-    let balance = customer.balance.unwrap();
-    if balance < price {
-        return Err(ServiceError::BadRequest("Not enough money".to_string()));
-    }
+    // let customer = get_user(db, user.id, &data.stripe_client.0).await?;
+    // let balance = customer.balance.unwrap();
+    // if balance < price {
+    //     return Err(ServiceError::BadRequest("Not enough money".to_string()));
+    // }
 
     let dinner_order = dinner_orders::ActiveModel {
         user_id: Set(user_id),
@@ -120,13 +120,15 @@ async fn create_order(
             })
             .collect::<Vec<_>>();
 
-        extras_order::Entity::insert_many(vector)
-            .exec(db)
-            .await
-            .map_err(|e| convert_err_to_500(e, Some("Database error creating extras_order: {}")))?;
+        if !vector.is_empty(){
+            extras_order::Entity::insert_many(vector)
+                .exec(db)
+                .await
+                .map_err(|e| convert_err_to_500(e, Some("Database error creating extras_order: {}")))?;
+        }
     }
 
-    pay(&data.stripe_client.0, db, user, price).await?;
+    // pay(&data.stripe_client.0, db, user, price).await?;
     Ok("Order created successfully".to_string())
 }
 
