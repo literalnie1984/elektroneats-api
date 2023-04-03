@@ -69,7 +69,16 @@ async fn main() -> std::io::Result<()> {
         //     .allowed_headers(vec![header::AUTHORIZATION, header::CONTENT_TYPE]);
 
         let routes = web::scope("/api")
-            .service(Files::new("/image", "./images"))
+            .service(
+                Files::new("/image", "./images")
+                    .index_file("placeholder.jpg")
+                    .default_handler(|req: ServiceRequest| async {
+                        let (req, _) = req.into_parts();
+                        let file = NamedFile::open_async("./images/placeholder.jpg").await?;
+                        let res = file.into_response(&req);
+                        Ok(ServiceResponse::new(req, res))
+                    }),
+            )
             .service(
                 web::scope("/user")
                     .service(login)
