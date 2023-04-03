@@ -15,7 +15,7 @@ use log::error;
 use migration::DbErr;
 use nanoid::nanoid;
 use sea_orm::{DatabaseConnection, EntityTrait};
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, str::FromStr, thread};
 use stripe::{Client, Customer, CustomerId, UpdateCustomer};
 
 use errors::ServiceError;
@@ -81,10 +81,15 @@ pub async fn send_verification_mail(
             .pool_config(PoolConfig::new().max_size(20))
             .build();
 
-    match smtp.send(mail).await {
-        Err(_) => Err(ServiceError::InternalError),
-        Ok(_) => Ok("email send".to_string()),
-    }
+    let mail_send = thread::spawn(|| async move {
+        eprintln!("Thread");
+        match smtp.send(mail).await {
+            Ok(_) => Ok::<String, ServiceError>("email.send".to_string()),
+            Err(_) => Err::<String, ServiceError>(ServiceError::InternalError),
+        }
+    });
+    // mail_send.join().expect("err").await;
+    Ok("email send".to_string())
 }
 
 pub fn get_header_val<'r>(req: &'r HttpRequest, key: &'r str) -> Option<&'r str> {
