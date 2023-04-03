@@ -11,7 +11,7 @@ use lettre::{
     },
     AsyncSmtpTransport, AsyncStd1Executor, AsyncTransport,
 };
-use log::error;
+use log::{error, info};
 use migration::DbErr;
 use nanoid::nanoid;
 use sea_orm::{DatabaseConnection, EntityTrait};
@@ -81,13 +81,18 @@ pub async fn send_verification_mail(
             .pool_config(PoolConfig::new().max_size(20))
             .build();
 
-    let mail_send = thread::spawn(|| async move {
-        eprintln!("Thread");
-        match smtp.send(mail).await {
-            Ok(_) => Ok::<String, ServiceError>("email.send".to_string()),
-            Err(_) => Err::<String, ServiceError>(ServiceError::InternalError),
-        }
+    actix_rt::spawn(async move {
+        info!("robimy mały trolling");
+        smtp.send(mail).await.unwrap();
     });
+
+    // let mail_send = thread::spawn(|| async move {
+    //     eprintln!("Thread");
+    //     match smtp.send(mail).await {
+    //         Ok(_) => Ok::<String, ServiceError>("email.send".to_string()),
+    //         Err(_) => Err::<String, ServiceError>(ServiceError::InternalError),
+    //     }
+    // });
     // mail_send.join().expect("err").await;
     Ok("email send".to_string())
 }
