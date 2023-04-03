@@ -1,21 +1,28 @@
-use std::{collections::{HashSet, HashMap}, mem};
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+};
 
 use actix_web::{get, post, web};
 use entity::{
     dinner, dinner_orders, extras, extras_order, model_enums::Status, user, user_dinner_orders,
 };
-use rust_decimal::{Decimal, prelude::ToPrimitive};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect, ActiveEnum};
+use rust_decimal::{prelude::ToPrimitive, Decimal};
+use sea_orm::{
+    ActiveEnum, ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter,
+    QuerySelect, Set,
+};
 
 use crate::{
     appstate::AppState,
     convert_err_to_500,
     errors::ServiceError,
+    get_user,
     jwt_auth::AuthUser,
-    map_db_err,
+    map_db_err, pay,
     routes::structs::{
         AllUsersOrders, DinnerResponse, OrderRequest, OrderResponse, UserOrders, UserWithOrders,
-    }, get_user, pay,
+    },
 };
 
 //TODO: TRANSACTIONS PROBABLY
@@ -41,32 +48,39 @@ async fn create_order(
         .flat_map(|x| x.extras_ids.clone())
         .collect::<Vec<_>>();
 
-    let dinners:Vec<(i32, Decimal)> = dinner::Entity::find()
+    let dinners: Vec<(i32, Decimal)> = dinner::Entity::find()
         .filter(dinner::Column::Id.is_in(dinner_ids.clone()))
         .select_only()
         .column(dinner::Column::Id)
         .column(dinner::Column::Price)
         .into_tuple()
         .all(db)
-        .await.map_err(map_db_err)?;
-    let extras:Vec<(i32, Decimal)> = extras::Entity::find()
+        .await
+        .map_err(map_db_err)?;
+    let extras: Vec<(i32, Decimal)> = extras::Entity::find()
         .filter(extras::Column::Id.is_in(extras_ids.clone()))
         .select_only()
         .column(extras::Column::Id)
         .column(extras::Column::Price)
         .into_tuple()
         .all(db)
-        .await.map_err(map_db_err)?;
-    let dinners: HashMap<_, _>= dinners.into_iter().collect();
-    let extras: HashMap<_, _>= extras.into_iter().collect();
+        .await
+        .map_err(map_db_err)?;
+    let dinners: HashMap<_, _> = dinners.into_iter().collect();
+    let extras: HashMap<_, _> = extras.into_iter().collect();
 
-    let price: i64 = 
-    dinner_ids.into_iter().map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>() +
-    extras_ids.into_iter().map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64).sum::<i64>();
-    
+    let price: i64 = dinner_ids
+        .into_iter()
+        .map(|x| (dinners.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64)
+        .sum::<i64>()
+        + extras_ids
+            .into_iter()
+            .map(|x| (extras.get(&x).unwrap_or(&Decimal::ZERO).to_f64().unwrap() * 100f64) as i64)
+            .sum::<i64>();
+
     let customer = get_user(db, user.id, &data.stripe_client.0).await?;
     let balance = customer.balance.unwrap();
-    if balance < price{
+    if balance < price {
         return Err(ServiceError::BadRequest("Not enough money".to_string()));
     }
 
@@ -204,7 +218,12 @@ async fn get_pending_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, &[Status::Paid, Status::Prepared, Status::Ready]).await
+    get_user_orders(
+        user_id,
+        db,
+        &[Status::Paid, Status::Prepared, Status::Ready],
+    )
+    .await
 }
 
 #[get("/")]
@@ -215,7 +234,101 @@ async fn get_all_user_orders(
     let db = &data.conn;
     let user_id = user.id;
 
-    get_user_orders(user_id, db, &[Status::Paid, Status::Prepared, Status::Ready, Status::Collected]).await
+    get_user_orders(
+        user_id,
+        db,
+        &[
+            Status::Paid,
+            Status::Prepared,
+            Status::Ready,
+            Status::Collected,
+        ],
+    )
+    .await
+}
+
+#[get("/")]
+async fn get_all_orders(
+    user: AuthUser,
+    data: web::Data<AppState>,
+) -> Result<web::Json<AllUsersOrders>, ServiceError> {
+    if !user.is_admin {
+        return Err(ServiceError::Unauthorized(
+            "Only admin can access that data".to_string(),
+        ));
+    }
+    let db = &data.conn;
+
+    let users_with_orders = user::Entity::find()
+        .find_with_related(dinner_orders::Entity)
+        .all(db)
+        .await
+        .map_err(map_db_err)?;
+
+    let mut dinners_out = HashSet::new();
+    let mut extras_out = HashSet::new();
+    let mut output: Vec<UserWithOrders> = Vec::with_capacity(users_with_orders.len());
+
+    for (user, orders) in users_with_orders.iter() {
+        output.push(UserWithOrders {
+            username: user.username.clone(),
+            user_id: user.id,
+            orders: Vec::new(),
+        });
+
+        let user_dinner_orders = orders
+            .load_many(user_dinner_orders::Entity, db)
+            .await
+            .map_err(map_db_err)?;
+
+        for (user_dinner, order) in user_dinner_orders.iter().zip(orders.iter()) {
+            let dinner = user_dinner
+                .load_one(dinner::Entity, db)
+                .await
+                .map_err(map_db_err)?;
+            let extras = user_dinner
+                .load_many_to_many(extras::Entity, extras_order::Entity, db)
+                .await
+                .map_err(map_db_err)?;
+
+            let mut dinners_with_extras = dinner
+                .into_iter()
+                .zip(extras.into_iter())
+                .map(|(dinner, extras)| {
+                    let dinner = dinner.unwrap();
+                    let dinner_id = dinner.id;
+                    dinners_out.insert(dinner);
+
+                    let mut extras = extras
+                        .into_iter()
+                        .map(|e| {
+                            let id = e.id;
+                            extras_out.insert(e);
+                            id
+                        })
+                        .collect::<Vec<_>>();
+
+                    DinnerResponse {
+                        dinner_id,
+                        extras_ids: mem::take(&mut extras),
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            output.last_mut().unwrap().orders.push(OrderResponse {
+                order_id: order.id,
+                collection_date: order.collection_date,
+                status: Status::from_repr(order.status).unwrap(),
+                dinners: mem::take(&mut dinners_with_extras),
+            });
+        }
+    }
+
+    Ok(web::Json(AllUsersOrders {
+        response: mem::take(&mut output),
+        dinners: mem::take(&mut dinners_out),
+        extras: mem::take(&mut extras_out),
+    }))
 }
 
 #[get("/pending")]

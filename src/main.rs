@@ -84,13 +84,14 @@ async fn main() -> std::io::Result<()> {
                             .service(create_order)
                             .service(get_completed_user_orders)
                             .service(get_pending_user_orders)
-                            .service(get_all_user_orders)
+                            .service(get_all_user_orders),
                     ),
             )
             .service(
                 web::scope("/admin").service(update_dish).service(
                     web::scope("/orders")
                         .service(get_all_pending_orders)
+                        .service(get_all_orders)
                         .service(change_order_status),
                 ),
             )
