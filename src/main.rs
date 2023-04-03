@@ -1,4 +1,5 @@
-use actix_files::Files;
+use actix_files::{Files, NamedFile};
+use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::web::service;
 use async_std::sync::RwLock;
 use kantyna_api::init_db;
@@ -119,6 +120,16 @@ async fn main() -> std::io::Result<()> {
             .app_data(state.clone())
             .service(routes)
             .service(Files::new("/admin", "./static/admin").index_file("index.html"))
+            .service(
+                Files::new("/admin", "./static/admin")
+                    .index_file("index.html")
+                    .default_handler(|req: ServiceRequest| async {
+                        let (req, _) = req.into_parts();
+                        let file = NamedFile::open_async("./static/admin/index.html").await?;
+                        let res = file.into_response(&req);
+                        Ok(ServiceResponse::new(req, res))
+                    }),
+            )
         // .service(Files::new("/", "./static/kantyna").index_file("index.html"))
     })
     .bind(("0.0.0.0", 4765))? //arbitrary port used
