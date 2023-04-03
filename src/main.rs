@@ -112,6 +112,7 @@ async fn main() -> std::io::Result<()> {
                     .service(init_wallet)
                     .service(get_balance)
                     .service(customer_details)
+                    .service(delete_wallet)
                     // .service(test_balance)
                     .service(received_payment),
             )
@@ -128,7 +129,6 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(state.clone())
             .service(routes)
-            .service(Files::new("/admin", "./static/admin").index_file("index.html"))
             .service(
                 Files::new("/admin", "./static/admin")
                     .index_file("index.html")
