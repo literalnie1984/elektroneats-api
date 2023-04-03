@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, HttpRequest};
+use actix_web::{delete, get, post, web, HttpRequest};
 use entity::{prelude::User, user};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use std::{borrow::Borrow, collections::HashMap, mem};
@@ -99,6 +99,13 @@ async fn customer_details(
 ) -> Result<web::Json<Customer>, ServiceError> {
     let user = get_user(&data.conn, user.id, &data.stripe_client.0).await?;
     Ok(web::Json(user))
+}
+
+#[delete("/wallet")]
+async fn delete_wallet(user: AuthUser, data: web::Data<AppState>) -> Result<String, ServiceError> {
+    let user = get_user(&data.conn, user.id, &data.stripe_client.0).await?;
+    Customer::delete(&data.stripe_client.0, &user.id);
+    Ok("Delete wallet".into())
 }
 
 #[post("/init")]
