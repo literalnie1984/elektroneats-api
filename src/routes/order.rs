@@ -5,7 +5,7 @@ use entity::{
     dinner, dinner_orders, extras, extras_order, model_enums::Status, user, user_dinner_orders,
 };
 use rust_decimal::{Decimal, prelude::ToPrimitive};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, QueryFilter, Set, QuerySelect, ActiveEnum};
 
 use crate::{
     appstate::AppState,
@@ -73,6 +73,7 @@ async fn create_order(
     let dinner_order = dinner_orders::ActiveModel {
         user_id: Set(user_id),
         collection_date: Set(order.collection_date),
+        status: Set(Status::Paid.into_value()),
         ..Default::default()
     };
 
