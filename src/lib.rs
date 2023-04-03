@@ -83,17 +83,14 @@ pub async fn send_verification_mail(
 
     actix_rt::spawn(async move {
         info!("robimy mały trolling");
-        smtp.send(mail).await.unwrap();
+        for _i in 0..2{
+            match smtp.send(mail.clone()).await{
+                Ok(_) => break,
+                Err(e) => error!("Mail send error: {e}"),
+            }
+        }
     });
 
-    // let mail_send = thread::spawn(|| async move {
-    //     eprintln!("Thread");
-    //     match smtp.send(mail).await {
-    //         Ok(_) => Ok::<String, ServiceError>("email.send".to_string()),
-    //         Err(_) => Err::<String, ServiceError>(ServiceError::InternalError),
-    //     }
-    // });
-    // mail_send.join().expect("err").await;
     Ok("email send".to_string())
 }
 
