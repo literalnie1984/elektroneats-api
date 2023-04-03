@@ -207,6 +207,17 @@ async fn get_pending_user_orders(
     get_user_orders(user_id, db, &[Status::Paid, Status::Prepared, Status::Ready]).await
 }
 
+#[get("/")]
+async fn get_all_user_orders(
+    user: AuthUser,
+    data: web::Data<AppState>,
+) -> Result<web::Json<UserOrders>, ServiceError> {
+    let db = &data.conn;
+    let user_id = user.id;
+
+    get_user_orders(user_id, db, &[Status::Paid, Status::Prepared, Status::Ready, Status::Collected]).await
+}
+
 #[get("/pending")]
 async fn get_all_pending_orders(
     user: AuthUser,

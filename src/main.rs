@@ -1,4 +1,5 @@
 use actix_files::Files;
+use actix_web::web::service;
 use async_std::sync::RwLock;
 use kantyna_api::init_db;
 use kantyna_api::routes::{admin::*, menu::*, order::*, payment::*, users::*};
@@ -82,7 +83,8 @@ async fn main() -> std::io::Result<()> {
                         web::scope("/orders")
                             .service(create_order)
                             .service(get_completed_user_orders)
-                            .service(get_pending_user_orders),
+                            .service(get_pending_user_orders)
+                            .service(get_all_user_orders)
                     ),
             )
             .service(
