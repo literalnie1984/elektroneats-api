@@ -265,70 +265,7 @@ async fn get_all_orders(
         .await
         .map_err(map_db_err)?;
 
-    let mut dinners_out = HashSet::new();
-    let mut extras_out = HashSet::new();
-    let mut output: Vec<UserWithOrders> = Vec::with_capacity(users_with_orders.len());
-
-    for (user, orders) in users_with_orders.iter() {
-        output.push(UserWithOrders {
-            username: user.username.clone(),
-            user_id: user.id,
-            orders: Vec::new(),
-        });
-
-        let user_dinner_orders = orders
-            .load_many(user_dinner_orders::Entity, db)
-            .await
-            .map_err(map_db_err)?;
-
-        for (user_dinner, order) in user_dinner_orders.iter().zip(orders.iter()) {
-            let dinner = user_dinner
-                .load_one(dinner::Entity, db)
-                .await
-                .map_err(map_db_err)?;
-            let extras = user_dinner
-                .load_many_to_many(extras::Entity, extras_order::Entity, db)
-                .await
-                .map_err(map_db_err)?;
-
-            let mut dinners_with_extras = dinner
-                .into_iter()
-                .zip(extras.into_iter())
-                .map(|(dinner, extras)| {
-                    let dinner = dinner.unwrap();
-                    let dinner_id = dinner.id;
-                    dinners_out.insert(dinner);
-
-                    let mut extras = extras
-                        .into_iter()
-                        .map(|e| {
-                            let id = e.id;
-                            extras_out.insert(e);
-                            id
-                        })
-                        .collect::<Vec<_>>();
-
-                    DinnerResponse {
-                        dinner_id,
-                        extras_ids: mem::take(&mut extras),
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            output.last_mut().unwrap().orders.push(OrderResponse {
-                order_id: order.id,
-                collection_date: order.collection_date,
-                status: Status::from_repr(order.status).unwrap(),
-                dinners: mem::take(&mut dinners_with_extras),
-            });
-        }
-    }
-
-    Ok(web::Json(AllUsersOrders {
-        response: mem::take(&mut output),
-        dinners: mem::take(&mut dinners_out),
-        extras: mem::take(&mut extras_out),
-    }))
+    get_all_orders_from_users(db, users_with_orders).await
 }
 
 #[get("/pending")]
@@ -350,6 +287,13 @@ async fn get_all_pending_orders(
         .await
         .map_err(map_db_err)?;
 
+    get_all_orders_from_users(db, users_with_orders).await
+}
+
+async fn get_all_orders_from_users(
+    db: &DatabaseConnection,
+    users_with_orders: Vec<(user::Model, Vec<dinner_orders::Model>)>,
+) -> Result<web::Json<AllUsersOrders>, ServiceError> {
     let mut dinners_out = HashSet::new();
     let mut extras_out = HashSet::new();
     let mut output: Vec<UserWithOrders> = Vec::with_capacity(users_with_orders.len());
