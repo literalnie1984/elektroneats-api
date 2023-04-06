@@ -11,11 +11,10 @@ rustup install stable
 ```
 3. Powyższa komenda zainstaluje także cargo
 4. Załóż konto na stripe
-5. Pobierz stripe-cli i uruchom komendę 
+5. Pobierz stripe-cli i uruchom poniższą komendę, która przekieruje pomyślne płatności na endpoint który doładowywuje konto:
 ```
 stripe listen --forward-to http://localhost:4765/api/payment/received
 ```
-przekieruje ona pomyślne płatności na endpoint który doładowywuje konto
 6. stwórz plik .env ze zmiennymi:
 ```
 DATABASE_URL - URL bazy danych w formacie:
@@ -33,26 +32,22 @@ WEBHOOK_SECRET - token wygenerowany przez komendę z kroku 5.
 JWT_SECRET - hash za pomocą którego JWT będzie szyfrowane, może być wygenerowany np. komendą openssl rand -base64 32
 ```
 7. Stwórz bazę danych o nazwie podanej w DATABASE_URL
-8. Za pomocą komendy 
+8. Zbuduj cały program za pomocą komendy:
 ```
 cargo build
 ```
-zbuduj cały program
-9. Uruchom komendę
+9. Uruchom poniższą komendę, która zaimportuje wszystkie tabelki i pobierze aktualne menu ze strony elektronika:
 ```
 cargo run -- initdb
 ```
-Zaimportuje ona wszystkie tabelki i pobierze aktualne menu ze strony elektronika
-10. Znadując się w głównym katalogu (tam gdzie Cargo.toml) uruchom samą aplikację za pomocą
+10. Znadując się w głównym katalogu (tam gdzie Cargo.toml) uruchom samą aplikację w wersji deweloperskiej:
 ```
 cargo run
 ```
-wersja deweloperska
-lub
+lub w wersji produkcyjnej:
 ```
 cargo run --release
 ```
-wersja produkcyjna
 11. Na podomenach
 ```
 http://127.0.0.1:4765/api/
