@@ -56,7 +56,9 @@ pub async fn send_verification_mail(
     activators: &ActivatorsVec,
     email_type: VerificationType,
 ) -> Result<String, ServiceError> {
-    let from = "Kantyna-App <kantyna.noreply@mikut.dev>".parse().unwrap();
+    let smtp_name = dotenvy::var("EMAIL_NAME").expect("NO EMAIL_NAME in .env");
+    let smtp_relay = dotenvy::var("SMTP_RELAY").expect("NO SMTP_RELAY in .env");
+    let from = format!("Kantyna-App <{}>", smtp_name).parse().unwrap();
     let to = email
         .parse()
         .map_err(|err| convert_err_to_500(err, Some("Mail creation err")))?;
@@ -71,10 +73,10 @@ pub async fn send_verification_mail(
     (*activators).insert(activation_code, email.into());
 
     let smtp: AsyncSmtpTransport<AsyncStd1Executor> =
-        AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay("mikut.dev")
+        AsyncSmtpTransport::<AsyncStd1Executor>::starttls_relay(&smtp_relay)
             .unwrap()
             .credentials(Credentials::new(
-                "kantyna.noreply@mikut.dev".to_owned(),
+                smtp_name,
                 dotenvy::var("EMAIL_PASS").expect("NO EMAIL_PASS val provided in .env"),
             ))
             .authentication(vec![Mechanism::Plain])
@@ -83,8 +85,8 @@ pub async fn send_verification_mail(
 
     actix_rt::spawn(async move {
         info!("robimy mały trolling");
-        for _i in 0..2{
-            match smtp.send(mail.clone()).await{
+        for _i in 0..2 {
+            match smtp.send(mail.clone()).await {
                 Ok(_) => break,
                 Err(e) => error!("Mail send error: {e}"),
             }
